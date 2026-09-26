@@ -1,0 +1,89 @@
+# ENV-01 normative run specification (plan v10 §1, frozen in Phase 1)
+# This file is the single source of truth for run/task states and limits.
+# test/spec.test.ts asserts that src/run.ts conforms to it.
+spec_version: "10.0"
+frozen: true
+
+run_states:
+  - CREATED
+  - VALIDATING_CONFIG
+  - APPLICABILITY
+  - RUNNING
+  - COMPILING
+  - FINAL_REVIEW
+  - COMPLETE
+  - FAILED_CONFIGURATION
+  - FAILED_PROVIDER
+  - FAILED_DOCUMENT
+  - FAILED_NONCONVERGENCE
+
+# The chain is fully autonomous. This list MUST stay empty.
+wait_for_human_states: []
+
+terminal_run_states:
+  - COMPLETE
+  - FAILED_CONFIGURATION
+  - FAILED_PROVIDER
+  - FAILED_DOCUMENT
+  - FAILED_NONCONVERGENCE
+
+task_states:
+  - PENDING
+  - READY
+  - AUTHORING
+  - REVIEWING
+  - REVISING
+  - COMPLETE
+  - SKIPPED
+  - BLOCKED_BY_FAILURE
+  - FAILED_NONCONVERGENCE
+  - FAILED_DOCUMENT
+  - FAILED_PROVIDER
+
+terminal_task_states:
+  - COMPLETE
+  - SKIPPED
+  - BLOCKED_BY_FAILURE
+  - FAILED_NONCONVERGENCE
+  - FAILED_DOCUMENT
+  - FAILED_PROVIDER
+
+limits:
+  max_review_cycles: 6          # operator decision: reviewed up to 6 times, then branch-scoped failure
+  max_invocation_retries: 2     # transient/validator retries per invocation before FAILED_DOCUMENT/FAILED_PROVIDER
+
+# Task transitions (event -> from -> to). Anything not listed is rejected.
+task_transitions:
+  - { event: start,              from: [PENDING, READY],               to: AUTHORING }
+  - { event: author_ok,          from: [AUTHORING, REVISING],          to: REVIEWING }
+  - { event: author_invalid,     from: [AUTHORING, REVISING],          to: same, until: max_invocation_retries, then: FAILED_DOCUMENT, failure_log: true, block_downstream: true }
+  - { event: review(pass),       from: [REVIEWING],                    to: COMPLETE }
+  - { event: review(revise),     from: [REVIEWING],                    to: REVISING, until: max_review_cycles, then: FAILED_NONCONVERGENCE, failure_log: true, block_downstream: true }
+  - { event: transient_error,    from: [AUTHORING, REVISING, REVIEWING], to: same, until: max_invocation_retries, then: FAILED_PROVIDER, failure_log: true, block_downstream: true }
+  - { event: provider_exhausted, from: [any],                          to: FAILED_PROVIDER, failure_log: true, block_downstream: true }
+  - { event: upstream_failed,    from: [PENDING],                      to: BLOCKED_BY_FAILURE }
+  - { event: not_applicable,     from: [PENDING],                      to: SKIPPED }
+
+# Run outcome, evaluated when no task is runnable (precedence order)
+run_outcome:
+  - { if: any_task FAILED_NONCONVERGENCE, then: FAILED_NONCONVERGENCE }
+  - { if: any_task FAILED_DOCUMENT,       then: FAILED_DOCUMENT }
+  - { if: any_task FAILED_PROVIDER,       then: FAILED_PROVIDER }
+  - { if: any_task PENDING,               then: FAILED_CONFIGURATION }
+  - { else: COMPLETE }
+
+artifacts:
+  failure_log: "00-Governance/run/{run_id}/failures/{task_id}.failure.md"
+  run_record:  "00-Governance/run/{run_id}/run.md"
+  compiled_plan: "40-Engineering-Lead/EL/EL-COMPILED-IMPL-PLAN.md"
+
+seeds:
+  path: "00-Governance/workflow-reference/seeds/"
+  filename: "SEED-nn-<slug>.md"
+  header: { id: "SEED-nn", version: "1.0", status: approved, owner: OP }
+  required_facts: [platforms, markets, audience, monetisation, ai_dependencies, ugc]
+  rule: "Each fact must be stated in at least one seed's front-matter facts: block or as a '## <fact>' section; a run cannot start otherwise (FAILED_CONFIGURATION)."
+
+standards:
+  path: "00-Governance/workflow-reference/standards/"
+  rule: "Operator-supplied engineering and non-engineering content standards. Phase 4 normalises them into criterion IDs; every document class must map to at least one criterion."
