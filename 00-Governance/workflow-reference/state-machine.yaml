@@ -81,9 +81,23 @@ seeds:
   path: "00-Governance/workflow-reference/seeds/"
   filename: "SEED-nn-<slug>.md"
   header: { id: "SEED-nn", version: "1.0", status: approved, owner: OP }
-  required_facts: [platforms, markets, audience, monetisation, ai_dependencies, ugc]
-  rule: "Each fact must be stated in at least one seed's front-matter facts: block or as a '## <fact>' section; a run cannot start otherwise (FAILED_CONFIGURATION)."
+  # Machine metadata only. The body is free-form prose (headings, tables, lists, decisions, requirements …)
+  # describing the platform itself; nothing in the body is validated by software — the agents interpret it.
+  machine_checks: [file_readable, unified_header_present, id_matches_SEED-nn, id_unique, status_approved, owner_OP, version_present, body_non_empty]
+  body_min_chars: 200
+  semantic_checks: none
+  rule: "At least one seed file; every seed passes the machine checks; otherwise the run stops in VALIDATING_CONFIG as FAILED_CONFIGURATION. Every seed is supplied in full to the Stage-0 package and to every authoring/review invocation (subject to the context cap)."
+
+applicability:
+  decided_by: "the applicability task (kind: applicability, owner SP13, stage 0) reading the complete seed corpus + the Stage-0 PL package"
+  conditional_domains: "derived from the registry: every role gated by a domain:/pairing: applicability rule (SP01–SP17, SE23, SE24)"
+  output: "one Markdown table in the decision document: | domain | determination | evidence |"
+  determinations: [applies, does_not_apply, unknown]
+  evidence: "required for applies/does_not_apply — cites SEED-nn or a source document id; unknown must state what evidence was missing"
+  machine_checks: [row_per_conditional_domain, determination_in_vocabulary, evidence_present, no_duplicate_rows]   # failure ⇒ author_invalid
+  review: "independent peer review through the ordinary review cycle (≤ 6) before the decision is authoritative"
+  freeze: "on review pass: unknown ⇒ applies; mask written to 00-Governance/run/{run_id}/applicability.json and to the run record; non-applicable tasks → SKIPPED; the mask never changes for the rest of the run"
 
 standards:
   path: "00-Governance/workflow-reference/standards/"
-  rule: "Operator-supplied engineering and non-engineering content standards. Phase 4 normalises them into criterion IDs; every document class must map to at least one criterion."
+  rule: "Operator-supplied engineering and non-engineering content standards, supplied in full as context. Phase 4 additionally normalises them into criterion IDs for the coverage validator; every document class must map to at least one criterion."
