@@ -1,0 +1,12 @@
+# ENV-01: never commit credentials or local tooling state
+client_secret.json
+token.json
+tokens.json
+*.pem
+.dev.vars
+.wrangler/
+node_modules/
+__pycache__/
+folder-ids.json
+criteria.json
+registry.json
