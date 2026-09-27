@@ -90,7 +90,7 @@ seeds:
 
 applicability:
   decided_by: "the applicability task (kind: applicability, owner SP13, stage 0) reading the complete seed corpus + the Stage-0 PL package"
-  conditional_domains: "derived from the registry: every role gated by a domain:/pairing: applicability rule (SP01–SP17, SE23, SE24)"
+  conditional_domains: "derived from the registry: every role gated by a domain:/pairing: applicability rule (SP01–SP22, SE23, SE24, SE25 — 25 gap domains)"
   output: "one Markdown table in the decision document: | domain | determination | evidence |"
   determinations: [applies, does_not_apply, unknown]
   evidence: "required for applies/does_not_apply — cites SEED-nn or a source document id; unknown must state what evidence was missing"
@@ -101,3 +101,16 @@ applicability:
 standards:
   path: "00-Governance/workflow-reference/standards/"
   rule: "Operator-supplied engineering and non-engineering content standards, supplied in full as context. Phase 4 additionally normalises them into criterion IDs for the coverage validator; every document class must map to at least one criterion."
+
+implementation_plan_guideline:
+  document: "STD-IMPL-nn under 00-Governance/workflow-reference/standards/ (operator-supplied; machine wrapper only)"
+  applies_to: [domain_plan, compiled_plan]
+  domain_plan_scope: "the domain section only (default §4 'How to author the implementation plan'), supplied in full to SExx authors and their reviewers"
+  compiled_plan_scope: "the entire document, supplied in full to the Lead Engineer and the final reviewer"
+  outcomes: "GL-<section>-nn ids produced by the Phase 4 normaliser from the guideline's sub-headings / list items; listed with the outline criteria"
+  dispositions: [covered, adapted]           # not_applicable is not permitted for guideline outcomes
+  adaptation: "changes the MEANS only, where the guideline's means cannot be applied to this platform as written; never the outcome or intent; recorded as {changed, reason, outcome_preserved_by} in the completion and in the plan's '## Guideline adaptations' table"
+  machine_checks: [every_GL_outcome_disposed, disposition_in_vocabulary, adapted_has_record, register_table_matches_completion]   # failure ⇒ author_invalid
+  review: "engineering peer reviewer verifies each adaptation preserves the outcome and its reason is a property of this platform; finding type guideline_deviation is blocking"
+  compiled_plan_rule: "the compiled plan disposes every outcome of every section and its adaptation register contains every domain adaptation (plan validator check); the Lead Engineer makes the final adaptations"
+  rollup_to_operator: none
