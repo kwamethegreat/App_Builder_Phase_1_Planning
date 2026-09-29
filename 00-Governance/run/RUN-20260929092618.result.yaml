@@ -1,0 +1,8 @@
+run_id: RUN-20260929092618
+state: FAILED_CONFIGURATION
+problems:
+  - "secret ANTHROPIC_VAULT_ID not set (vault holding the engineering agents' RS tokens; Phase 5.2)"
+  - "var TEMPLATE_AUTHOR_EN not set (provider agent id of the template; Phase 5.2)"
+  - "var TEMPLATE_AUTHOR_NE not set (provider agent id of the template; Phase 5.2)"
+  - "var TEMPLATE_REVIEW_NE not set (provider agent id of the template; Phase 5.2)"
+  - "var TEMPLATE_REVIEW_EN not set (provider agent id of the template; Phase 5.2)"
