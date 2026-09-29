@@ -1,6 +1,0 @@
----
-id: PROBE-AGENT-068
-version: 1
-owner: AGENT-068
----
-probe PROBE-AGENT-068-1790665438-W

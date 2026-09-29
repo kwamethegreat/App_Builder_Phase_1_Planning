@@ -1,6 +1,0 @@
----
-id: PROBE-AGENT-047
-version: 1
-owner: AGENT-047
----
-probe PROBE-AGENT-047-1790662619-W

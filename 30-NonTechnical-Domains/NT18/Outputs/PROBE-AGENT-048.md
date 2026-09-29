@@ -1,6 +1,0 @@
----
-id: PROBE-AGENT-048
-version: 1
-owner: AGENT-048
----
-probe PROBE-AGENT-048-1790662630-W

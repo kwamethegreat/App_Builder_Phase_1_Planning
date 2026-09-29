@@ -1,6 +1,0 @@
----
-id: PROBE-AGENT-011
-version: 1
-owner: AGENT-011
----
-probe PROBE-AGENT-011-1790658328-W

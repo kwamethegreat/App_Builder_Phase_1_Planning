@@ -1,6 +1,0 @@
----
-id: PROBE-AGENT-100
-version: 1
-owner: AGENT-100
----
-probe PROBE-AGENT-100-1790665903-W

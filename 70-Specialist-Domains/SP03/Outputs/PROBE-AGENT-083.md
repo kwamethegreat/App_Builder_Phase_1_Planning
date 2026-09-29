@@ -1,6 +1,0 @@
----
-id: PROBE-AGENT-083
-version: 1
-owner: AGENT-083
----
-probe PROBE-AGENT-083-1790665622-W

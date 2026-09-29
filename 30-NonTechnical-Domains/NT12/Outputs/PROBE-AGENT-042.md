@@ -1,6 +1,0 @@
----
-id: PROBE-AGENT-042
-version: 1
-owner: AGENT-042
----
-probe PROBE-AGENT-042-1790660063-W
