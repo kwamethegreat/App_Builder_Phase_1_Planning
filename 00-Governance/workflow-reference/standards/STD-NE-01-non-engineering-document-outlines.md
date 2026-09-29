@@ -22181,6 +22181,97 @@ The following 49 non-engineering artifacts are the additive content contracts in
 
 ---
 
+### VP Edit Revalidation Rules [SP18]
+
+**Purpose:** Define which VP edits to a suggested, watchlisted, reserved or qualified idea count as material, and exactly which analyses must re-run — and in what order — before the idea's status, score and readiness are considered current again.
+
+**Governance / routing**
+- **Originating domain(s):** SP18 plus authoritative upstream evidence/policies referenced by this artifact
+- **Authoring domain:** SP18 — Senior Opportunity Intelligence & Venture Discovery Manager
+- **Required reviewing domains:** Product Lead, NT02, NT08, NT17, NT19, SP13, SP15, SP17, SP19, SP20, SP21, SP22, SE25
+- **Required cross-reference domains:** NT02, NT08, NT17, NT19, SP13, SP15, SP17, SP19, SP20, SP21, SP22, SE23, SE24, SE25
+- **Approval / sign-off:** SP18 owner + Product Lead; SP17 signs the exception and authentication rules; SP20/SP21 sign the commercial revalidation triggers.
+- **Downstream consumers:** Affected Product/Business/UX/DX/Engineering owners; Project Lead; Application Controller; SP14/Release Governance when material
+- **Workflow stage(s):** 0-2 discovery/planning as applicable; 6-10 reconciliation/baseline; 12-17 execution/validation; lifecycle refresh after launch when the artifact remains applicable
+
+**Best-practice standards / leading-practice references**
+- ISO 56007:2023; ISO 56008:2024; ISO 31000:2018; NIST AI RMF 1.0 when automated re-scoring is used; W3C PROV for edit and revalidation lineage.
+- Apply ISO/IEC/IEEE 29148 requirement-quality principles whenever the artifact contains normative requirements.
+- Apply SP13 source-authority, freshness, provenance, confidence, supersession and revalidation rules to time-sensitive evidence.
+
+**Optimal document outline**
+- **1.** Editable idea attributes and the classification of each as material or non-material.
+- **2.** Materiality rules: which attribute changes (audience, scope, monetization, platform, market, brand, technical approach, thresholds) trigger revalidation, and which are cosmetic.
+- **3.** Revalidation matrix: for each material change, the analyses that must re-run — commercial, audience, differentiation/uniqueness, technical feasibility, schedule/duration, deployment, compliance, brand/IP, readiness — with owner and ordering dependencies.
+- **4.** Status behavior during revalidation: how score, confidence, qualification, list position and readiness are displayed and held until revalidation completes.
+- **5.** Outcome handling: re-qualification, displacement to reserve or watchlist, disqualification, and the VP exception path with reason capture, risk display and persistent exception marking.
+- **6.** Authentication and authority requirements for edits and overrides by risk class.
+- **7.** Lineage and audit: version linkage to the pre-edit idea, evidence supersession and immutable edit records.
+- **8.** Service levels: maximum revalidation latency by change class and the autonomous versus escalated resolution rules.
+- **9.** Interaction with the pre-build gate: which revalidations must be current before a Build action may proceed.
+
+**Explicitly exclude / reference instead**
+- Scoring formula and weights (Composite Opportunity Scoring Model & Dynamic Weighting Rules).
+- Forecast methodology (SP20 standards).
+- Similarity thresholds (Idea Uniqueness & Similarity Standard).
+- Scheduler and rules-engine implementation (SE25 designs).
+- Visual design of the edit experience (DX01).
+
+**Completion / quality checks**
+- Every material assertion has a source, assumption, decision, requirement, or evidence reference appropriate to the artifact.
+- Applicable current-practice sources are verified through SP13 standards/provenance governance; stale or superseded guidance is not silently reused.
+- No unresolved contradiction remains with a required reviewing or cross-reference domain; material conflicts are dispositioned through the full-mesh workflow.
+- Every material change class maps to a complete, ordered set of revalidations with named owners; no change class is left implicit.
+- Stable IDs, owners, status values, thresholds, exceptions, and evidence links are complete enough for downstream requirements-to-evidence traceability.
+- The artifact can be consumed independently for its stated purpose without requiring readers to infer missing applicability, decision authority, acceptance criteria, residual risk, or next action.
+
+---
+
+### Audience Drift & Revalidation Report [SP19]
+
+**Purpose:** Define the recurring report that detects when an idea's or product's actual audience, demographic evidence or behavioral signals have drifted from the baselined audience model, and the revalidation obligations that drift imposes.
+
+**Governance / routing**
+- **Originating domain(s):** SP19 plus authoritative upstream evidence/policies referenced by this artifact
+- **Authoring domain:** SP19 — Senior Audience & Behavioral Intelligence Manager
+- **Required reviewing domains:** Product Lead, NT03, NT04, NT13, NT14, NT18, UX01, SP04, SP05, SP11, SP13, SP18, SP20, SE24, SE25
+- **Required cross-reference domains:** NT04, NT13, NT14, NT18, UX01, SP04, SP05, SP11, SP13, SP18, SP20, SE23, SE24, SE25
+- **Approval / sign-off:** SP19 owner + Product Lead; NT13/NT14/SP11/SP04 sign where privacy, regulation, minors or safety requirements apply.
+- **Downstream consumers:** Affected Product/Business/UX/DX/Engineering owners; Project Lead; Application Controller; SP14/Release Governance when material
+- **Workflow stage(s):** 0-2 discovery/planning as applicable; 6-10 reconciliation/baseline; 12-17 execution/validation; lifecycle refresh after launch when the artifact remains applicable
+
+**Best-practice standards / leading-practice references**
+- ISO 56006:2021; ISO 56008:2024; NIST Privacy Framework; NIST AI RMF 1.0 when AI-assisted segmentation/scoring is used; ISO 9241-210/11/110 and WCAG 2.2 where experience implications apply; W3C PROV.
+- Apply ISO/IEC/IEEE 29148 requirement-quality principles whenever the artifact contains normative requirements.
+- Apply SP13 source-authority, freshness, provenance, confidence, supersession and revalidation rules to time-sensitive evidence.
+
+**Optimal document outline**
+- **1.** Report scope, cadence and event triggers (scheduled, material event, VP edit, evidence supersession).
+- **2.** Baseline reference: the audience model, fit scores, sensitive-audience classification and evidence register versions the report compares against.
+- **3.** Drift measures: audience composition, demographic evidence freshness and confidence, behavioral-signal shifts, healthy-engagement indicators, and sensitive-audience exposure changes, each with a defined threshold.
+- **4.** Drift disposition per idea/product: within tolerance, revalidate, escalate, or restrict.
+- **5.** Revalidation obligations: which audience, safety, privacy, commercial and UX analyses re-run for each disposition, with owners.
+- **6.** Sensitive-audience and minors handling: mandatory escalation paths and governance holds when drift enters a higher-risk classification.
+- **7.** Evidence provenance, limitations and uncertainty affecting the drift conclusion.
+- **8.** Actions, owners, deadlines and linkage to portfolio, opportunity and readiness decisions.
+- **9.** Audit trail: report versions, decisions taken and their outcomes for calibration of future drift thresholds.
+
+**Explicitly exclude / reference instead**
+- The audience model itself (Primary/Secondary/Adjacent Audience Model) and fit-scoring formula (Audience Fit Scoring Standard).
+- Privacy-policy content (NT13) and legal artifact text (SP10).
+- Telemetry and data-pipeline implementation (SE24/SE25 designs).
+- Product analytics event definitions (SP05).
+
+**Completion / quality checks**
+- Every material assertion has a source, assumption, decision, requirement, or evidence reference appropriate to the artifact.
+- Applicable current-practice sources are verified through SP13 standards/provenance governance; stale or superseded guidance is not silently reused.
+- No unresolved contradiction remains with a required reviewing or cross-reference domain; material conflicts are dispositioned through the full-mesh workflow.
+- Evidence quality, freshness, population/geography applicability, uncertainty and limitations are explicit when they can change the decision.
+- Every drift measure has a threshold, a disposition and an owner; sensitive-audience drift always has an escalation path.
+- The artifact can be consumed independently for its stated purpose without requiring readers to infer missing applicability, decision authority, acceptance criteria, residual risk, or next action.
+
+---
+
 # Appendix — 25-Gap Non-Engineering Artifact Count Reconciliation
 
 - Product Lead mappings: **10**
