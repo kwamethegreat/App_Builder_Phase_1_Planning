@@ -1,0 +1,8 @@
+run_id: SMK-20260930084500
+state: COMPLETE
+finished_at: 2026-09-30T09:55:16.233Z
+compiled_plan_commit: null
+task_counts:
+  COMPLETE: 1
+failed_tasks:
+blocked_tasks: []
