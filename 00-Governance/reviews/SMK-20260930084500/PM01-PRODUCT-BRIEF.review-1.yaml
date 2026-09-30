@@ -1,0 +1,166 @@
+---
+id: PM01-PRODUCT-BRIEF
+version: 2
+status: complete
+owner: REVIEWER_NE
+based_on: [SEED-01, STD-NE-01, PM01-PRODUCT-BRIEF]
+requirements: [PM01-REQ-02, PM01-REQ-06, PM01-AC-02, PM01-AC-06, ASM-PM01-02, ASM-PM01-04]
+---
+task_id: PM01-PRODUCT-BRIEF
+run_id: SMK-20260930084500:PM01-PRODUCT-BRIEF:review:1
+verdict: revise
+reviewed_target:
+  path: 20-Product-Domains/PM01/Outputs/_smoke/SMK-20260930084500/PM01-PRODUCT-BRIEF.md
+  version: 1
+  sha: fa6391302aec89c56ca5e694f49b983ed2c15494
+review_basis:
+  seed: SEED-01 v1.0, read in full through read_document and supplied context.
+  outline: Supplied criteria and STD-NE-01 v1.0 PM01 Domain Product Brief section.
+  standard_sha: 53eefb7598ac67be9fed14b8d7278a647fcb9811
+  availability: Repository inventory confirms none of the supplied PL dependencies or adjacent output documents is visible; no consistency with their unavailable content is asserted.
+  previous_review: No previous review for this target and round was supplied or visible.
+required_source_dispositions:
+  SEED-01: covered
+  PL-REQ-ID-REGISTER: 'not_applicable: no repository path supplied or visible in the inventory.'
+  PL-PRODUCT-VISION-BRIEF: 'not_applicable: supplied path is missing and absent from inventory.'
+  PL-PRODUCT-STRATEGY: 'not_applicable: supplied path is missing and absent from inventory.'
+  PL-MASTER-PRODUCT-REQUIREM: 'not_applicable: supplied path is missing and absent from inventory.'
+  PL-MVP-SCOPE-DEFINITI: 'not_applicable: supplied path is missing and absent from inventory.'
+  PL-MASTER-PRODUCT-ROADMAP: 'not_applicable: supplied path is missing and absent from inventory.'
+  PL-PRODUCT-PRIORITY-FRAMEWOR: 'not_applicable: supplied path is missing and absent from inventory.'
+  PL-PRODUCT-KPIS-SUCCESS: 'not_applicable: supplied path is missing and absent from inventory.'
+  PL-PRODUCT-CONSTRAI-GUARDRAI: 'not_applicable: supplied path is missing and absent from inventory.'
+  PL-PRODUCT-DECISION-LOG: 'not_applicable: supplied path is missing and absent from inventory.'
+  PL-GREENFIE-BASELINE-EXTERNAL: 'not_applicable: supplied path is missing and absent from inventory.'
+adjacent_disposition:
+  disposition: not_applicable
+  reason: All adjacent output paths are marked missing in context and absent from repository inventory; there is no content to compare.
+  documents:
+    - PL-PRODUCT-VISION-BRIEF
+    - PL-PRODUCT-STRATEGY
+    - PL-MASTER-PRODUCT-REQUIREM
+    - PM02-PRODUCT-BRIEF
+    - PM02-STRATEGY
+    - PM02-PRD
+    - PM03-PRODUCT-BRIEF
+    - PM03-STRATEGY
+    - PM03-PRD
+    - PM06-PRODUCT-BRIEF
+    - PM06-STRATEGY
+    - PM06-PRD
+    - PM07-PRODUCT-BRIEF
+    - PM07-STRATEGY
+    - PM07-PRD
+    - PM08-PRODUCT-BRIEF
+    - PM08-STRATEGY
+    - PM08-PRD
+    - PM13-PRODUCT-BRIEF
+    - PM13-STRATEGY
+    - PM13-PRD
+    - PM15-PRODUCT-BRIEF
+    - PM15-STRATEGY
+    - PM15-PRD
+    - PM17-PRODUCT-BRIEF
+    - PM17-STRATEGY
+    - PM17-PRD
+    - NT03-MARKET-COMPETIT-OPPORTUN
+    - NT03-CUSTOMER-POSITION-PRODUCT
+    - NT03-MARKET-OPPORTUN-ASSESSME
+    - NT04-GO-MARKET-CUSTOMER
+    - NT04-TARGET-CUSTOMER-PERSONA
+    - NT04-POSITION-MESSAGIN-FRAMEWOR
+    - NT11-CUSTOMER-EXPERIEN-SUPPORT
+    - NT11-CUSTOMER-JOURNEY
+    - NT11-ONBOARDI-ACTIVATI-STRATEGY
+checks_in_order:
+  - type: outline_gap
+    result: All eight outline sections are present and substantive; no separate finding.
+  - type: source_gap
+    result: F1 concerns applicable standard routing; F2 concerns missing dependency dispositions. In-scope seed commitments are otherwise preserved.
+  - type: misinterpretation
+    result: No finding; platform capability is distinguished from generated-product requirements, and build initiation is distinguished from readiness and promotion.
+  - type: scope
+    result: No finding; capability and acceptance tables remain outcome-level, with no implementation design or schedule detail.
+  - type: contradiction
+    result: No separate finding; no internal product-policy conflict or conflict with available seed content identified.
+  - type: unsupported_addition
+    result: No separate finding; measurement and provisional downstream-reference limitations are explicitly labelled assumptions.
+  - type: dependency_inconsistency
+    result: F3 records the workflow-stage mismatch; seed versions, product categories and numerical target qualifications otherwise match.
+  - type: downstream_unusable
+    result: No separate finding; the brief supplies actionable domain outcomes and boundaries, but F1 must close to prevent incomplete specialist handoffs.
+criterion_dispositions:
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-01: covered in section 0
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-02: covered in section 1
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-03: covered in section 2
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-04: covered in section 3
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-05: covered in section 4; specialist-interface correction in F1
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-06: covered in section 5 with explicit provisional PRD reference
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-07: covered in section 6; F1 and F2 apply
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-08: covered in section 7 with explicit provisional KPI reference
+  QC-PM01-DOMAIN-PRODUCT-BRIEF-01: F1 and F2
+  QC-PM01-DOMAIN-PRODUCT-BRIEF-02: No conflict with available product baselines; unavailable adjacent content not assessed
+  QC-PM01-DOMAIN-PRODUCT-BRIEF-03: F3
+  QC-PM01-DOMAIN-PRODUCT-BRIEF-04: F1
+  BND-PM01-DOMAIN-PRODUCT-BRIEF-01: respected; no detailed functional or nonfunctional specification
+  BND-PM01-DOMAIN-PRODUCT-BRIEF-02: respected; Engineering ownership retained
+  BND-PM01-DOMAIN-PRODUCT-BRIEF-03: respected; no schedule detail
+findings:
+  - id: F1
+    severity: major
+    type: source_gap
+    outline_id: OUT-PM01-DOMAIN-PRODUCT-BRIEF-07
+    source_or_requirement_id: STD-NE-01
+    description: >-
+      Section 6's specialist hooks stop at SP17, and PM01-AC-06 assigns forecast
+      evidence participation to PM01, PM08 and SP05 without the canonical forecast
+      authority. STD-NE-01 is readable in this review and its 25-gap routing overlay
+      assigns build/deployment forecasting methodology and calibration to SP20,
+      suggested-idea/one-click-build handoff to SP18, audience intelligence to SP19,
+      market-validation qualification evidence to SP21, and commercial resilience/
+      portfolio brand to SP22. These concerns are expressly consumed by sections
+      2, 5 and 6. The seed-only fallback in ASM-PM01-04 omits these applicable
+      interfaces, so consumers can route forecasts and readiness inputs without
+      their specialist authorities.
+    required_correction: >-
+      Read the available STD-NE-01 routing overlay and relevant expansion entries.
+      Update sections 4, 6 and the forecast acceptance/evidence handoff to identify
+      SP18's suggested-concept handoff and SP20's forecast-methodology/calibration
+      inputs, separating PM01's presentation/continuity outcome from specialist
+      ownership and Project's committed schedule. Add proportionate SP19, SP21 and
+      SP22 input/revalidation interfaces for the audience, qualification and
+      commercial-resilience/portfolio-brand concerns actually consumed here, or
+      explicit justified non-applicability where a concern is not used. Reference
+      standard artifact titles/sections when output files are unavailable; do not
+      invent approved artifacts. Replace the obsolete standard-access fallback
+      and record STD-NE-01 in based_on when relied upon.
+  - id: F2
+    severity: minor
+    type: source_gap
+    outline_id: OUT-PM01-DOMAIN-PRODUCT-BRIEF-07
+    source_or_requirement_id: null
+    description: >-
+      The self-review source-coverage table lists only SEED-01 and
+      PL-REQ-ID-REGISTER. None of the ten required PL dependencies is individually
+      dispositioned. General references to unavailable downstream baselines do
+      not identify which required upstream inputs were absent.
+    required_correction: >-
+      Add a compact dependency-disposition table naming all ten PL dependency IDs
+      supplied in the run context, each marked not_applicable with the one-line
+      reason that its supplied file is unavailable in this snapshot. Do not imply
+      that their content was read or approved, or add them to based_on.
+  - id: F3
+    severity: minor
+    type: dependency_inconsistency
+    outline_id: QC-PM01-DOMAIN-PRODUCT-BRIEF-03
+    source_or_requirement_id: STD-NE-01
+    description: >-
+      Section 0 calls this a 'Stage-0 product-direction baseline' and the final
+      self-review says 'Pass for a Stage-0 brief'. The target/run stage is 1 and
+      STD-NE-01's PM01 Domain Product Brief routing starts at workflow stage 1;
+      stage 0 is not the assigned stage for this artifact.
+    required_correction: >-
+      Remove both Stage-0 labels or replace them with the correct stage-1 planning
+      context. Retain the distinction between document completion and build or
+      production authorization; do not confuse workflow stage 1 with acceptance
+      of a macro delivery stage.
