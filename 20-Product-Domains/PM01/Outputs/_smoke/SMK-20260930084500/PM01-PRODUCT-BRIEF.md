@@ -1,87 +1,123 @@
 ---
 id: PM01-PRODUCT-BRIEF
-version: 2
+version: 3
 status: complete
 owner: PM01
-based_on: [SEED-01, STD-NE-01]
+based_on: [SEED-01]
 requirements: [PM01-REQ-01, PM01-REQ-02, PM01-REQ-03, PM01-REQ-04, PM01-REQ-05, PM01-REQ-06, ASM-PM01-01]
 ---
 # Domain Product Brief
 
 ## 0. Domain context (OUT-PM01-DOMAIN-PRODUCT-BRIEF-01)
-PM01 owns end-to-end intent-to-software experience: requirements, planning, agent workflows, code creation, debugging, refactoring and human oversight. This is platform capability, not hypothetical app requirements. Completion means authoring, not build/release authorization. (SEED-01 §§1,25,26; STD-NE-01 §11.)
+PM01 owns the end-to-end intent-to-software experience: requirements, planning, agent workflows, code creation, debugging, refactoring and human oversight. This brief defines platform outcomes, not requirements for a hypothetical generated application. Cross-domain concerns enter as constraints, evidence or handoffs, not transferred ownership. Completion of this document is not build or release authorization. (SEED-01 §§1,25,26.)
 
 ## 1. Executive summary (OUT-PM01-DOMAIN-PRODUCT-BRIEF-02)
-The initial single, potentially nontechnical VP/operator needs intended outcomes translated into maintainable software without manually coordinating implementation. PM01 preserves intent across development and makes consequential decisions understandable; independent evidence, not code generation alone, establishes readiness. (SEED-01 §§1–3,8–9,21.)
+The initial single, potentially nontechnical VP/operator needs intended outcomes translated into maintainable software without manually coordinating implementation. PM01 preserves intent through autonomous development and makes consequential decisions understandable. Its value is reduced coordination and intervention without losing intent, authority or independently demonstrated quality—not merely faster code generation. (SEED-01 §§1–3,8–9,21,29.)
 
-## 2. Users and stakeholders (OUT-PM01-DOMAIN-PRODUCT-BRIEF-03)
-The VP expresses goals and oversees consequential decisions. Long-term product/business users change constraints; technical users inspect, debug and refactor; operators initiate evidence-backed repairs; independent validators challenge acceptance. These are seed-defined roles, not research-validated personas. UX01 owns user evidence. (SEED-01 §§2.1,18,32.11.)
+## 2. Users, stakeholders and jobs (OUT-PM01-DOMAIN-PRODUCT-BRIEF-03)
+| Audience | Domain job | Evidence basis |
+|---|---|---|
+| Initial VP/operator | Express goals, inspect inferred assumptions, understand progress and decide consequential tradeoffs without managing implementation | SEED-01 §§2.1,21 |
+| Longer-term product/business users | Change requirements and constraints while understanding affected work and outcomes | §§2.1,32.4 |
+| Technical builders | Inspect or modify source and tests; debug or refactor while preserving validated intent | §§2.1,9.3,15.2 |
+| Operators/lifecycle stakeholders | Bring operational evidence into diagnosis and governed change | §§13,16,25 |
+| Independent validators | Challenge readiness against intended outcomes and evidence, rather than builder confidence | §§8.1,9,32.6 |
 
-## 3. Outcomes and value (OUT-PM01-DOMAIN-PRODUCT-BRIEF-04)
-Measure intent fidelity, valid autonomous completion, intervention time, corrections, unnecessary escalations, first-pass validation, escaped defects and forecast calibration. No numerical autonomy/fidelity target is supplied. Shared throughput objective: “Approximately 5–10 newly deployed applications per week for the initial VP operator, plus ongoing updates to existing products.” Upper-bound objective: “≤7 days when requirements, access, credentials, accounts and external dependencies are available and the product remains within supported MVP scope.” Neither overrides quality gates. (SEED-01 §§27.2,29.)
+These audiences are normative seed descriptions, not research-validated personas. UX01 owns user evidence and experience acceptance; DX01 owns design expression. (SEED-01 §18.)
 
-## 4. Scope boundary (OUT-PM01-DOMAIN-PRODUCT-BRIEF-05)
-PM01 owns continuity and oversight across development. PM02 owns model capability; PM03 authority; PM06 creation interfaces; PM07 workspace; PM08 builds/promotion; PM09 infrastructure; PM10 data; PM11 integration/export; PM12 security; PM13 validation; PM14 operations; PM15 lifecycle; PM16 ecosystem; PM17 orchestration. PM04/PM05 own product-type creation across web apps, mobile apps, browser games and mobile games; APIs/backends are components, not a fifth MVP category. (SEED-01 §§2.2,24,26.)
+## 3. Desired outcomes and measurable value (OUT-PM01-DOMAIN-PRODUCT-BRIEF-04)
+| Outcome | Measure | Interpretation |
+|---|---|---|
+| Preserve intended outcomes | Delivered requirements matching validated intent; assumption correction rate | Corrections and missing intent must remain visible, not hidden by completion counts |
+| Reduce manual coordination safely | Autonomous lifecycle completion, intervention time per product, unnecessary escalation rate, decisions later reversed | Autonomy counts as value only while applicable quality and intended outcomes are met |
+| Make development predictable | Idea-to-non-production, idea-to-production, blocker time and forecast calibration | Report dependencies and uncertainty rather than unconditional dates |
+| Make changes trustworthy | First-pass validation, escaped defects and critical defects at release | Quality gates cannot be averaged away by velocity gains |
 
-STD-NE-01's 25-gap overlay assigns suggested-concept handoff to SP18, audience intelligence to SP19, forecasts/calibration to SP20, market-validation assurance to SP21 and commercial resilience/portfolio brand to SP22. PM01 presents their conclusions without replacing them. NT06 pricing, NT13 privacy, NT18 accessibility, NT19 individual brand and UX01 evidence remain external authorities (standard respective domain sections).
+Sources: SEED-01 §§17,27.4,29. No numerical autonomy or intent-fidelity target is supplied; ASM-PM01-01 governs unspecified metrics.
 
-BND-PM01-DOMAIN-PRODUCT-BRIEF-01: not_applicable—detailed requirements belong to Domain PRD (STD-NE-01 §13).
-BND-PM01-DOMAIN-PRODUCT-BRIEF-02: not_applicable—implementation and technology choices belong to Engineering (SEED-01 §26.5).
-BND-PM01-DOMAIN-PRODUCT-BRIEF-03: not_applicable—schedule detail belongs to Domain Roadmap/Project plan (STD-NE-01 §§19,386).
+Shared platform objective: “Approximately 5–10 newly deployed applications per week for the initial VP operator, plus ongoing updates to existing products.” Upper-bound objective: “≤7 days when requirements, access, credentials, accounts and external dependencies are available and the product remains within supported MVP scope.” These are cross-domain objectives, not PM01-only delivery guarantees or permission to bypass validation. (SEED-01 §§4.3,27.2.)
 
-## 5. Capabilities (OUT-PM01-DOMAIN-PRODUCT-BRIEF-06)
-PM01 owns the following outcome requirements; detailed elaboration belongs to the Domain PRD, STD-NE-01 §13, whose output is unavailable.
+## 4. Domain scope boundary (OUT-PM01-DOMAIN-PRODUCT-BRIEF-05)
+PM01 owns coherent development intent, progress interpretation, change continuity and consequential oversight. The following interfaces preserve adjacent ownership. (SEED-01 §§25–26.)
 
-| ID | Priority | Outcome / rationale | Acceptance outcome and source |
-|---|---|---|---|
-| PM01-REQ-01 | Critical | Preserve intent and visible assumptions; prevent wrong outcomes | Intent-to-behavior evidence; consequential ambiguity resolved before irreversible work; seed §§3,21.1 |
-| PM01-REQ-02 | Critical | Gate manual/suggested Build requests on readiness | No silent prerequisite bypass; authorized force-start records incompleteness/rationale/controls; §§32.3,46 |
-| PM01-REQ-03 | Critical | Preserve context through agents, creation, debugging/refactoring | Changes trace to objectives and affected revalidation; §§9.3,15.2,32.4 |
-| PM01-REQ-04 | Critical | Understandable, auditable consequential oversight | Operator comprehension and authority evidence; maximum modes deliberately authorized; §21 |
-| PM01-REQ-05 | Critical | Evidence-aware completion, not preview self-certification | Independent/non-production evidence across four output types; critical defects block release; §§4,8–9,23–24 |
-| PM01-REQ-06 | High | Honest launch forecasting | Before authorization expose construction, validation/testing, deployment and total duration, likely date/range, confidence/dependencies; update with actuals/history/calibration after first completed app; §27.4 |
-
-## 6. Assumptions, constraints and dependencies (OUT-PM01-DOMAIN-PRODUCT-BRIEF-07)
-ASM-PM01-01: absent output baselines cannot be assumed approved. PM01 uses direct seed/standard references and baselines unspecified metrics with SP05/UX01 before improvement claims. Applicability.json/workflow appendices are unavailable; conservative subject-matched interfaces below do not substitute for SP13's formal decision.
-
-| Input authority / STD-NE-01 artifact | PM01 interface and revalidation |
+| Adjacent owners | PM01 handoff / consumed result |
 |---|---|
-| SP18 Suggested-App Detail & One-Click Build Requirements (§557), VP Edit Revalidation Rules | Consume idea/version, qualification and lineage; return edits/Build disposition; material edits invalidate affected readiness |
-| SP19 Primary/Secondary/Adjacent Audience Model (§559), Sensitive-Audience Classification & Governance (§561) | Consume audience/confidence/sensitivity; audience changes/drift return to audience, safety/privacy, commercial and UX owners |
-| SP20 Build/Deployment Duration Forecast Standard (§572), Historical Estimate Learning Policy (§573), Forecast Calibration & Backtesting Report (§569) | Consume versioned forecasts, assumptions/confidence/calibration; return scope changes and PM08/Engineering actuals. PM01 owns presentation, SP20 methodology/calibration, PJL committed schedules |
-| SP21 Market Validation Results & Qualification Decision (§583), Business-Model Red-Team Protocol (§578) | Consume challenged qualification evidence/limitations; scope, audience or monetization changes trigger revalidation; NT08/PL retain final commercial authority |
-| SP22 Distribution Concentration Risk Assessment (§584), Channel/Provider Fallback Strategy (§586), Portfolio Brand Architecture (§587) | Consume resilience and portfolio-brand constraints alongside PM11/NT17/NT19; changed channel/provider/brand relationships trigger revalidation |
-| PL Pre-Build Readiness Package (§597) | Consume current applicable contributions; missing/stale evidence cannot silently pass |
-| SP13, SP14, SP17, SP05 (standard domain sections) | Return context changes, readiness claims, decisions and metrics respectively for applicability, independent assurance, authority/audit and measurement validation |
+| PM02 / PM03 | Task needs and consequential decisions / model capability and autonomy constraints |
+| PM04 / PM05 | Product context and intended outcomes / product-type creation constraints for web apps, mobile apps, browser games and mobile games |
+| PM06 / PM07 | Intent, assumptions, change goals / creation interaction and code-workspace capabilities |
+| PM08 / PM09 | Ready work and validation needs / build, environment, promotion and capacity status |
+| PM10 / PM11 / PM12 | Context and change impact / governed data, integration/export, identity and security constraints |
+| PM13 / PM14 / PM15 | Acceptance intent and change rationale / independent validation, operational diagnosis and lifecycle context |
+| PM16 / PM17 | Product needs and handoff outcomes / ecosystem constraints and orchestration execution state |
 
-Material specialist contradictions block affected readiness until workflow reconciliation (seed §§33–36). Commercial thresholds/exemptions remain seed §28 and business-owner policy. Non-production/quality/authority gates cannot be traded for speed. Hardware strategy/BOM remains in seed §§38–45/Appendix G; SE11 owns physical realization, never copied here.
+APIs/backends are components of the four MVP categories, not a fifth category. PM01 consumes commercial qualification, audience, brand/IP and deployment conclusions when presenting build intent; it does not own opportunity scoring, pricing, legal clearance or infrastructure selection. NT06 pricing, NT13 privacy, NT18 accessibility, NT19 brand, UX01 research and SP13 applicability retain their seed-defined authority. (SEED-01 §§2.2,18,23.2,26,28,34.) Their output document IDs are not supplied in this context; no approved outputs are implied.
 
-| Missing source/dependency | Disposition |
+- BND-PM01-DOMAIN-PRODUCT-BRIEF-01 — not_applicable: detailed functional/nonfunctional requirements belong to the Domain PRD, not this brief.
+- BND-PM01-DOMAIN-PRODUCT-BRIEF-02 — not_applicable: implementation designs and technology choices belong to Engineering.
+- BND-PM01-DOMAIN-PRODUCT-BRIEF-03 — not_applicable: schedule detail belongs to the Domain Roadmap and Project plan.
+
+## 5. Key capabilities (OUT-PM01-DOMAIN-PRODUCT-BRIEF-06)
+These are outcome-level requirements owned by PM01; the Domain PRD is the downstream home for detailed elaboration, not reproduced here. Its governed output ID/file is not supplied or present in the PM01 folder.
+
+| ID | Priority | Capability and rationale | Acceptance outcome | Source |
+|---|---|---|---|---|
+| PM01-REQ-01 | Critical | Preserve intent and visible assumptions to prevent building the wrong outcome | Delivered behavior traces to validated intent; consequential ambiguity is resolved before irreversible work; reversible assumptions remain visible/changeable | SEED-01 §§3,21.1 |
+| PM01-REQ-02 | Critical | Gate manual and suggested Build actions on readiness, preventing silent prerequisite bypass | Build invokes formal readiness; missing prerequisites are resolved safely or routed as consequential decisions; authorized force-start records incompleteness, justification and compensating controls | §§32.3,46 |
+| PM01-REQ-03 | Critical | Preserve context across planning, agent handoffs, code creation, debugging and refactoring | Changes trace to objectives and affected requirements/evidence; debugging outcomes and refactoring preservation claims receive impact-based revalidation | §§9.3,15.2,25,32.4 |
+| PM01-REQ-04 | Critical | Provide understandable, auditable oversight without routine interruption | Consequential decisions expose rationale, alternatives and impacts; assumptions/actions/evidence can be inspected; maximum modes require deliberate extra authorization | §21 |
+| PM01-REQ-05 | Critical | Distinguish preview/build completion from independently evidenced readiness | Production-intended changes in all four output categories pass required non-production and independent validation; critical defects block release | §§4,8–9,23–24,32.7 |
+| PM01-REQ-06 | High | Present evidence-based launch forecasts to support informed authorization | Before authorization show construction, validation/testing, release/deployment and total duration, likely date/range, confidence and dependencies; update through execution and incorporate historical builds/calibration after the first completed app | §27.4 |
+
+Acceptance outcomes summarize the cited obligations rather than adding detailed test protocols or architecture.
+
+## 6. Critical assumptions, constraints and dependencies (OUT-PM01-DOMAIN-PRODUCT-BRIEF-07)
+**ASM-PM01-01 — evidence boundary.** Absent output baselines cannot be assumed approved. PM01 uses direct SEED-01 references; unspecified metric thresholds and windows require a measured baseline and Domain KPI definition before quantitative improvement claims. PM01 owns this disposition, with SP05 measurement and UX01 evidence inputs. This is not a waiver of seed hard gates. No empirical performance or usability success is claimed.
+
+| Constraint/dependency | PM01 treatment and validation hook | Source |
+|---|---|---|
+| Applicability and standards currency — SP13 | Provide changed product context; consume applicable domains/evidence and reasoned exclusions; changed audience, geography, features or policies trigger reassessment | SEED-01 §§6–7,33–36 |
+| Independent assurance — PM13/SP14 | Supply intended outcomes and readiness claims; consume independent findings, current Release Evidence Package and challenger disposition before representing release readiness | §§9,32.6–7,34 |
+| Decision governance — PM03/SP17 and SE23 | Present applicable authority, authentication and exception evidence; align human decisions and machine controls; changed authority invalidates affected decision assumptions | §§21,32.18–19,35–36 |
+| Measurement — SP05/UX01 | Submit domain measures and comprehension claims for measurement-quality and user-evidence validation | §§18,29,34 |
+| Commercial/idea handoff | Preserve idea lineage and qualification evidence; material VP edits trigger affected commercial, audience, technical, schedule, brand/IP and risk revalidation | §§28.1–4,46 |
+| Forecast and delivery inputs — PM08/Engineering/PJL | Consume duration evidence and actuals; separate probabilistic launch forecast from committed project schedule; PM01 owns understandable presentation, not schedule authority | §§26.5,27.4 |
+| Runtime/hardware — PM09/SE11 | Consume availability/isolation outcomes; no hardware choice or BOM copied here. Canonical strategy is SEED-01 v1.0 §§38–45 and Appendix G v2.2; physical realization belongs to SE11-PHYSICAL-INFRASTR-HARDWARE, SE11-HARDWARE-CAPACITY-SIZING and SE11-POWER-COOLING-RACK | §§38–46 |
+
+Commercial thresholds and personal-use exemption remain governed by SEED-01 §28, not redefined by PM01. Speed does not override required quality, security, compliance, financial or non-production constraints (§4.3). Specialist reverse validation follows §§33–36; no applicability.json or workflow Appendix F/G is supplied as a readable source in this invocation, so no formal applicability decision is asserted.
+
+### Required-source availability
+SEED-01 v1.0 is the sole seed listed and was read in full. All ten dependency reads returned not_found; the PL folder listing is empty. Missing-source dispositions follow the run-context rule, not a claim that these baselines are unnecessary to the wider program.
+
+| Source/dependency ID | Disposition |
 |---|---|
-| PL-REQ-ID-REGISTER | not_applicable: path/file unavailable in snapshot |
-| PL-PRODUCT-VISION-BRIEF | not_applicable: file unavailable |
-| PL-PRODUCT-STRATEGY | not_applicable: file unavailable |
-| PL-MASTER-PRODUCT-REQUIREM | not_applicable: file unavailable |
-| PL-MVP-SCOPE-DEFINITI | not_applicable: file unavailable |
-| PL-MASTER-PRODUCT-ROADMAP | not_applicable: file unavailable |
-| PL-PRODUCT-PRIORITY-FRAMEWOR | not_applicable: file unavailable |
-| PL-PRODUCT-KPIS-SUCCESS | not_applicable: file unavailable |
-| PL-PRODUCT-CONSTRAI-GUARDRAI | not_applicable: file unavailable |
-| PL-PRODUCT-DECISION-LOG | not_applicable: file unavailable |
-| PL-GREENFIE-BASELINE-EXTERNAL | not_applicable: file unavailable |
+| PL-REQ-ID-REGISTER | not_applicable: no path supplied and no file available in the PL folder |
+| PL-PRODUCT-VISION-BRIEF | not_applicable: named file not found |
+| PL-PRODUCT-STRATEGY | not_applicable: named file not found |
+| PL-MASTER-PRODUCT-REQUIREM | not_applicable: named file not found |
+| PL-MVP-SCOPE-DEFINITI | not_applicable: named file not found |
+| PL-MASTER-PRODUCT-ROADMAP | not_applicable: named file not found |
+| PL-PRODUCT-PRIORITY-FRAMEWOR | not_applicable: named file not found |
+| PL-PRODUCT-KPIS-SUCCESS | not_applicable: named file not found |
+| PL-PRODUCT-CONSTRAI-GUARDRAI | not_applicable: named file not found |
+| PL-PRODUCT-DECISION-LOG | not_applicable: named file not found |
+| PL-GREENFIE-BASELINE-EXTERNAL | not_applicable: named file not found |
 
-These ten PL dependencies are recorded from review F2; current context names no required dependencies. No absent content is claimed read/approved. Remaining product questions are dispositioned: clarification is risk-based (seed §21.1), Build is readiness-gated (§32.3), unspecified metric thresholds require evidence, and design/schedule are excluded. No unresolved brief-level decision remains.
+Product questions are dispositioned rather than left open: clarification is risk-based (§21.1); Build is readiness-gated (§32.3); unspecified metric targets use ASM-PM01-01; detailed design and scheduling remain excluded. No unresolved brief-level product decision remains.
 
 ### Conflicts
-No substantive conflict identified with available seed/standard. No agreement with absent outputs asserted. Stage labels removed rather than inventing workflow-stage or delivery-acceptance status.
+No substantive contradiction identified against the available authoritative seed. Agreement with absent PL or adjacent-domain outputs is not asserted. Version 2's STD-NE-01 and SP18–SP22 overlay citations are not carried forward as authority because that source is outside the supplied source set for this invocation; relevant capability intent remains traced directly to SEED-01 §§27–28,46. This is a source-scope correction, not a ruling against an unavailable standard.
 
-## 7. Success and KPI links (OUT-PM01-DOMAIN-PRODUCT-BRIEF-08)
-Success is understandable creation/change preserving intent, authority and independently evidenced quality. North star remains “the percentage of lifecycle work completed autonomously while still meeting intended outcomes and all applicable production-quality requirements” (seed §29.1). Domain KPIs / Success Metrics (STD-NE-01 §24; output unavailable) owns formulas, windows, baselines and targets. PM01 accepts the §5 outcomes with UX01 comprehension, PM13/SP14 quality, PM08 delivery, SP17 authority and SP20 forecast-method evidence. Forecast presentation must match SP20's current version, assumptions and calibration; committed PJL dates stay separately identified. Missing/failed evidence is not success; improved averages cannot offset hard-gate failure.
+## 7. Success definition and KPI links (OUT-PM01-DOMAIN-PRODUCT-BRIEF-08)
+Success is understandable creation and change that preserve intent, human authority and independently evidenced quality. The north star remains “the percentage of lifecycle work completed autonomously while still meeting intended outcomes and all applicable production-quality requirements.” (SEED-01 §29.1.)
+
+PM01 uses the six capability outcomes in §5 with UX01 comprehension evidence, PM13/SP14 quality evidence, PM08 delivery evidence and SP17 authority evidence. A preview, builder assertion, missing evidence or failed hard gate is not successful delivery. Critical defects at release must be zero; improved averages cannot compensate for a failed hard gate. (SEED-01 §§4.1,8.1,17.)
+
+The downstream Domain KPIs / Success Metrics document owns metric formulas, windows, baselines and targets; its output is not present in the PM01 folder and no governed ID is supplied. Until available, §3 and SEED-01 §29 provide the measurement families, with ASM-PM01-01 preventing invented thresholds. PL-PRODUCT-KPIS-SUCCESS is separately dispositioned above. This brief is consumable for domain planning, not an implementation specification or empirical acceptance report.
 
 ## Self-review and revision closure
-F1: §§4/6/7 restore readable STD-NE-01 and SP18–SP22 canonical interfaces, particularly SP20 forecast authority. F2: §6 individually dispositions all ten absent PL dependencies. F3: stage labels removed. This revision replaces the current target, not a release attestation.
+The supplied validator finding “header version 2 != 3” is corrected in the unified header: version is 3. This document supersedes PM01-PRODUCT-BRIEF version 2 at the same governed target; stable PM01 requirement IDs are preserved.
 
-QC-PM01-DOMAIN-PRODUCT-BRIEF-01 covered: claims trace to approved SEED-01 v1.0, readable STD-NE-01 v1.0 or explicit assumption; seed folder contains only SEED-01, read in full. Sources are normative, not empirical proof; external policy currency remains applicability-time work.
-QC-PM01-DOMAIN-PRODUCT-BRIEF-02 covered: external authorities and comparison limits explicit; no substantive contradiction identified.
-QC-PM01-DOMAIN-PRODUCT-BRIEF-03 covered: requested unified header and stable requirement IDs retained; no fabricated approved output links.
-QC-PM01-DOMAIN-PRODUCT-BRIEF-04 covered: scope, owners, measurable outcomes and evidence limits enable independent brief consumption, not implementation or schedule authorization.
+- QC-PM01-DOMAIN-PRODUCT-BRIEF-01 — covered: material assertions cite SEED-01 or ASM-PM01-01; normative authority is distinguished from empirical evidence and time-sensitive sources require applicability-time revalidation.
+- QC-PM01-DOMAIN-PRODUCT-BRIEF-02 — covered: ownership and validation interfaces are explicit; no known substantive conflict is hidden and absent baselines are not represented as reconciled.
+- QC-PM01-DOMAIN-PRODUCT-BRIEF-03 — covered: header matches this run; prior version is explicitly superseded; unsupported inherited citations are dispositioned under Conflicts.
+- QC-PM01-DOMAIN-PRODUCT-BRIEF-04 — covered: scope, accountable owners, acceptance outcomes, seed thresholds, missing-source treatment and downstream boundaries are explicit.
