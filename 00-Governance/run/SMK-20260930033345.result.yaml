@@ -1,0 +1,9 @@
+run_id: SMK-20260930033345
+state: FAILED_PROVIDER
+finished_at: 2026-09-30T07:54:46.458Z
+compiled_plan_commit: null
+task_counts:
+  FAILED_PROVIDER: 1
+failed_tasks:
+  - {task: PM01-PRODUCT-BRIEF, status: FAILED_PROVIDER, review_cycles: 0, error: "rs registerRun: 404", log: 00-Governance/run/SMK-20260930033345/failures/PM01-PRODUCT-BRIEF.failure.md}
+blocked_tasks: []
