@@ -1,0 +1,109 @@
+---
+id: PM01-PRODUCT-BRIEF
+version: 3
+status: complete
+owner: REVIEWER_NE
+based_on: [SEED-01, STD-NE-01, PM01-PRODUCT-BRIEF]
+requirements: [PM01-REQ-02, PM01-REQ-06, PM01-AC-02, PM01-AC-06, ASM-PM01-04]
+---
+task_id: PM01-PRODUCT-BRIEF
+run_id: SMK-20260930084500:PM01-PRODUCT-BRIEF:review:2
+verdict: revise
+reviewed_target:
+  path: 20-Product-Domains/PM01/Outputs/_smoke/SMK-20260930084500/PM01-PRODUCT-BRIEF.md
+  version: 2
+  sha: e223e9a0360666b6f84867418acf990c950b5d5e
+previous_review:
+  path: 00-Governance/reviews/SMK-20260930084500/PM01-PRODUCT-BRIEF.review-1.yaml
+  sha: 89a39e5cc75680336dcd1db41c472c77228d4ae4
+  finding_dispositions:
+    F1: Not closed; applicable SP18-SP22 interfaces remain absent. Repeated as blocking under the re-review rule.
+    F2: Closed; section 6 individually dispositions all ten missing PL dependencies.
+    F3: Closed; section 0 now identifies Stage-1 planning and distinguishes authoring completion from construction and release acceptance.
+review_basis:
+  seed: SEED-01 v1.0 read in full, including appendices.
+  standard: STD-NE-01 v1.0 section 11, specialist routing overlay, and applicable opportunity-intelligence expansion entries.
+  standard_path: 00-Governance/workflow-reference/standards/STD-NE-01-non-engineering-document-outlines.md
+  standard_sha: 53eefb7598ac67be9fed14b8d7278a647fcb9811
+  instructions: Inline rules and repository global-rules.md and review-non-engineering.md.
+required_source_dispositions:
+  SEED-01: covered; only SEED-nn file in repository inventory
+  PL-REQ-ID-REGISTER: 'not_applicable: no supplied path or visible register file.'
+  PL-PRODUCT-VISION-BRIEF: 'not_applicable: read_document returned not_found.'
+  PL-PRODUCT-STRATEGY: 'not_applicable: read_document returned not_found.'
+  PL-MASTER-PRODUCT-REQUIREM: 'not_applicable: read_document returned not_found.'
+  PL-MVP-SCOPE-DEFINITI: 'not_applicable: read_document returned not_found.'
+  PL-MASTER-PRODUCT-ROADMAP: 'not_applicable: read_document returned not_found.'
+  PL-PRODUCT-PRIORITY-FRAMEWOR: 'not_applicable: read_document returned not_found.'
+  PL-PRODUCT-KPIS-SUCCESS: 'not_applicable: read_document returned not_found.'
+  PL-PRODUCT-CONSTRAI-GUARDRAI: 'not_applicable: read_document returned not_found.'
+  PL-PRODUCT-DECISION-LOG: 'not_applicable: read_document returned not_found.'
+  PL-GREENFIE-BASELINE-EXTERNAL: 'not_applicable: read_document returned not_found.'
+adjacent_disposition:
+  disposition: not_applicable
+  reason: All supplied adjacent output documents are marked missing in context and absent from the full repository inventory; no consistency with their unavailable content is asserted.
+checks_in_order:
+  - type: outline_gap
+    result: All eight outline sections are substantive; no separate finding.
+  - type: source_gap
+    result: F1 remains; missing PL dependency dispositions now satisfy F2.
+  - type: misinterpretation
+    result: No separate finding; platform versus generated-product scope and Build request versus authorization are distinguished.
+  - type: scope
+    result: No finding; capability and acceptance tables remain outcome-level, with implementation and schedule detail excluded.
+  - type: contradiction
+    result: No separate finding; no internal product-policy or seed conflict identified.
+  - type: unsupported_addition
+    result: No separate finding; provisional downstream links and unspecified measurement baselines are labelled assumptions.
+  - type: dependency_inconsistency
+    result: F3 closed; seed version, output categories and target qualifications match. The review version_to_write governs this review, not a retroactive change to the reviewed target version.
+  - type: downstream_unusable
+    result: F1 prevents complete specialist routing; otherwise outcomes, boundaries and evidence interfaces are usable at brief level.
+criterion_dispositions:
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-01: covered in section 0
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-02: covered in section 1
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-03: covered in section 2
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-04: covered in section 3
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-05: covered in section 4; F1 affects specialist interfaces
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-06: covered in section 5 with provisional PRD link
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-07: section 6 present; F1 remains
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-08: section 7 present with provisional KPI link; F1 affects forecast evidence ownership
+  QC-PM01-DOMAIN-PRODUCT-BRIEF-01: F1; available standard is incorrectly treated as unprovided
+  QC-PM01-DOMAIN-PRODUCT-BRIEF-02: No conflict with seed; unavailable adjacent baselines cannot be assessed
+  QC-PM01-DOMAIN-PRODUCT-BRIEF-03: F3 closed; F1 still affects canonical specialist ownership
+  QC-PM01-DOMAIN-PRODUCT-BRIEF-04: F1; estimate contributors and qualification owners do not identify canonical specialist authorities
+  BND-PM01-DOMAIN-PRODUCT-BRIEF-01: respected; detailed requirements excluded
+  BND-PM01-DOMAIN-PRODUCT-BRIEF-02: respected; implementation design excluded
+  BND-PM01-DOMAIN-PRODUCT-BRIEF-03: respected; schedule detail excluded
+findings:
+  - id: F1
+    severity: blocking
+    type: source_gap
+    outline_id: OUT-PM01-DOMAIN-PRODUCT-BRIEF-07
+    source_or_requirement_id: STD-NE-01
+    description: >-
+      Previous major F1 is not closed. Section 6 still limits explicit specialist
+      interfaces to SP05 and SP13-SP17, while PM01-AC-06 names only 'PM01 with PM08
+      and estimate contributors'. The revision disposition removes reliance on
+      an 'unprovided STD-NE-01 routing overlay', but STD-NE-01 v1.0 is readable at
+      00-Governance/workflow-reference/standards/STD-NE-01-non-engineering-document-outlines.md
+      with unchanged SHA 53eefb7598ac67be9fed14b8d7278a647fcb9811. Its routing
+      overlay and sections 557, 559, 569, 572, 573, 583 and 584-587 identify
+      SP18 suggested-concept/build handoff, SP19 audience inputs, SP20 duration
+      forecasting and calibration, SP21 qualification evidence and SP22 commercial
+      resilience/portfolio-brand inputs. The brief consumes these concerns but
+      leaves their specialist authorities unidentified. Generic future routing
+      through SP13 and unnamed contributors does not close the required handoffs.
+    required_correction: >-
+      Read the available STD-NE-01 routing overlay and relevant expansion entries.
+      Update sections 3, 4, 6 and 7 consistently to identify SP18's suggested-concept
+      and material-edit handoff and SP20's forecast-methodology, historical-learning
+      and calibration inputs, keeping PM01 responsible for presentation/continuity
+      and Project responsible for committed schedules. Add proportionate SP19,
+      SP21 and SP22 input/revalidation interfaces for the audience, qualification
+      and commercial-resilience/portfolio-brand concerns consumed here, or explicit
+      justified non-applicability for concerns not consumed. Reference standard
+      sections/artifact titles where outputs are absent rather than inventing
+      approved artifacts. Correct the unprovided-standard claim and ASM-PM01-04's
+      seed-only routing fallback, include STD-NE-01 in based_on when relied upon,
+      and record disposition of this prior finding in the revision history.
