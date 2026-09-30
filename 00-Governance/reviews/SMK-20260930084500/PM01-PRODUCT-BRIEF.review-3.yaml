@@ -1,0 +1,116 @@
+---
+id: PM01-PRODUCT-BRIEF
+version: 4
+status: complete
+owner: REVIEWER_NE
+based_on: [SEED-01, PM01-PRODUCT-BRIEF]
+requirements: [PM01-REQ-01, PM01-REQ-02, PM01-REQ-03, PM01-REQ-04, PM01-REQ-05, PM01-REQ-06, ASM-PM01-01]
+---
+task_id: PM01-PRODUCT-BRIEF
+run_id: SMK-20260930084500:PM01-PRODUCT-BRIEF:review:3
+verdict: pass
+reviewed_target:
+  path: 20-Product-Domains/PM01/Outputs/_smoke/SMK-20260930084500/PM01-PRODUCT-BRIEF.md
+  version: 3
+  sha: e96cfa7acaa615168024fb200fe5c18752cad6b8
+review_basis:
+  instructions: Inline context and repository global-rules.md and review-non-engineering.md.
+  outline: The eight OUT criteria, four QC criteria and three BND exclusions supplied in this invocation.
+  seed: SEED-01 v1.0 read in full, including appendices.
+  seed_sha: a121e493489cf4f9c0b576f5279c3fda94a592b0
+  availability: Full visible repository inventory checked; required PL files also individually requested through read_document.
+previous_reviews:
+  - path: 00-Governance/reviews/SMK-20260930084500/PM01-PRODUCT-BRIEF.review-1.yaml
+    sha: 89a39e5cc75680336dcd1db41c472c77228d4ae4
+  - path: 00-Governance/reviews/SMK-20260930084500/PM01-PRODUCT-BRIEF.review-2.yaml
+    sha: 1f5f0986ed34db9b6616d5831a9b901592ada0ec
+previous_finding_dispositions:
+  F1:
+    disposition: closed_by_source_scope_adjudication
+    rationale: >-
+      Section 6 Conflicts explicitly addresses the disputed STD-NE-01/SP18-SP22
+      overlay rather than silently omitting it. This invocation defines the content
+      standard as the outline criteria listed in context and restricts substantive
+      authority to seeds, those criteria, and required sources/dependencies.
+      STD-NE-01 is visible in the repository but is not designated as an additional
+      source of truth in this context. Visibility alone does not extend the
+      governing criteria. Consequently the prior demand to import its additional
+      specialist ownership cannot be sustained for this review. This closes the
+      disputed finding for this cycle; it does not certify implementation of that
+      overlay or declare the repository standard unavailable. The underlying seed
+      obligations remain represented by the Build gate, forecast/calibration outcome,
+      commercial input handoff and material-edit revalidation in sections 4-6.
+  F2:
+    disposition: closed
+    rationale: Section 6 individually dispositions all ten required PL dependencies and the unavailable register.
+  F3:
+    disposition: closed
+    rationale: Both incorrect Stage-0 labels are absent; section 0 distinguishes document completion from build and release authorization.
+required_source_dispositions:
+  SEED-01: covered; sole seed in the visible inventory
+  PL-REQ-ID-REGISTER: 'not_applicable: no supplied path and no visible register file.'
+  PL-PRODUCT-VISION-BRIEF: 'not_applicable: read_document returned not_found.'
+  PL-PRODUCT-STRATEGY: 'not_applicable: read_document returned not_found.'
+  PL-MASTER-PRODUCT-REQUIREM: 'not_applicable: read_document returned not_found.'
+  PL-MVP-SCOPE-DEFINITI: 'not_applicable: read_document returned not_found.'
+  PL-MASTER-PRODUCT-ROADMAP: 'not_applicable: read_document returned not_found.'
+  PL-PRODUCT-PRIORITY-FRAMEWOR: 'not_applicable: read_document returned not_found.'
+  PL-PRODUCT-KPIS-SUCCESS: 'not_applicable: read_document returned not_found.'
+  PL-PRODUCT-CONSTRAI-GUARDRAI: 'not_applicable: read_document returned not_found.'
+  PL-PRODUCT-DECISION-LOG: 'not_applicable: read_document returned not_found.'
+  PL-GREENFIE-BASELINE-EXTERNAL: 'not_applicable: read_document returned not_found.'
+adjacent_disposition:
+  disposition: not_applicable
+  reason: All supplied adjacent outputs are marked missing in context and absent from the visible repository inventory; there is no adjacent content to compare or approval to infer.
+checks_in_order:
+  - type: outline_gap
+    result: All eight sections are substantive. Missing PRD and Domain KPI outputs are explicitly identified rather than represented as available links.
+  - type: source_gap
+    result: No current finding. In-scope seed outcomes are preserved; prior F1 is adjudicated above and F2 remains closed.
+  - type: misinterpretation
+    result: No finding. Platform experience, generated-product breadth, Build initiation, readiness and production promotion remain distinct.
+  - type: scope
+    result: No finding. Capabilities remain outcome-level; detailed requirements, implementation choices and schedule detail are excluded.
+  - type: contradiction
+    result: No finding against the available seed. The disputed source scope is surfaced under Conflicts, not hidden.
+  - type: unsupported_addition
+    result: Minor F4 concerns three unsubstantiated downstream document identifiers; role-level infrastructure ownership itself is supported.
+  - type: dependency_inconsistency
+    result: No separate finding. Seed version, four product categories, throughput qualifications and forecast timing match. Version 4 applies to this review, not retroactively to target version 3.
+  - type: downstream_unusable
+    result: No finding. Scope, outcomes, constraints and domain handoffs are usable for brief-level planning; the document does not claim implementation or empirical acceptance readiness.
+criterion_dispositions:
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-01: covered in section 0; PM01-only outcomes with cross-domain interfaces
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-02: covered in section 1; coordination problem and governed-autonomy value
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-03: covered in section 2; initial and longer-term jobs distinguished
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-04: covered in section 3; seed measures and qualified shared objectives
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-05: covered in section 4; included ownership, exclusions and adjacent PM handoffs
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-06: covered in section 5; six outcome capabilities and explicit missing-PRD disposition
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-07: covered in section 6; assumptions, constraints, dependencies and product-question dispositions
+  OUT-PM01-DOMAIN-PRODUCT-BRIEF-08: covered in section 7; quality-constrained north star and explicit missing-KPI disposition
+  QC-PM01-DOMAIN-PRODUCT-BRIEF-01: generally covered; minor F4 applies to hardware document identifiers
+  QC-PM01-DOMAIN-PRODUCT-BRIEF-02: covered against available authority; no reconciliation with absent documents claimed
+  QC-PM01-DOMAIN-PRODUCT-BRIEF-03: covered for available authority; previous version explicitly superseded
+  QC-PM01-DOMAIN-PRODUCT-BRIEF-04: usable for domain planning; measurement limitations and hard gates explicit
+  BND-PM01-DOMAIN-PRODUCT-BRIEF-01: respected; no detailed functional or nonfunctional specification
+  BND-PM01-DOMAIN-PRODUCT-BRIEF-02: respected; no implementation design or technology selection
+  BND-PM01-DOMAIN-PRODUCT-BRIEF-03: respected; no project schedule detail
+findings:
+  - id: F4
+    severity: minor
+    type: unsupported_addition
+    outline_id: QC-PM01-DOMAIN-PRODUCT-BRIEF-01
+    source_or_requirement_id: SEED-01
+    description: >-
+      Section 6's Runtime/hardware row states that physical realization belongs to
+      SE11-PHYSICAL-INFRASTR-HARDWARE, SE11-HARDWARE-CAPACITY-SIZING and
+      SE11-POWER-COOLING-RACK. Those document identifiers are neither defined by
+      the cited SEED-01 sections nor supplied as governed outputs in this context,
+      and none is present in the visible repository inventory. Unlike the missing
+      PRD and KPI references, their unverified status is not disclosed. The seed
+      does support the PM09/SE11 role-level boundary, so this does not prevent
+      brief-level consumption.
+    required_correction: >-
+      Remove the three unverified document identifiers and retain the sourced
+      PM09/SE11 ownership boundary and seed references, or explicitly label them
+      as unverified downstream references rather than established output authority.
