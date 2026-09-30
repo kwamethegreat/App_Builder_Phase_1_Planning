@@ -1,18 +1,18 @@
 ---
 id: STD-ENG-01
-version: "1.0"
+version: "1.1"
 status: approved
 owner: OP
 based_on: []
 requirements: []
-source_file: "engineering_document_outlines_25_gap_complete.md"
+source_file: "engineering-document-outlines.md"
 ---
 
-# Engineering Document Outline Reference — 25-Gap Integrated Edition
+# Engineering Document Outline Reference — 25-Gap + Hardware Planning Integrated Edition
 
 ## Purpose
 
-This file defines the recommended content structure for every engineering artifact authored in the 19-gap-integrated full-mesh workflow: **29 Engineering Lead artifacts + 532 Senior Engineering domain artifact mappings = 561 authored engineering artifact mappings**. It is a content-design companion to the Full-Mesh Workflow document, not a replacement for it.
+This file defines the recommended content structure for every engineering artifact authored in the 19-gap-integrated full-mesh workflow: **29 Engineering Lead artifacts + 535 Senior Engineering domain artifact mappings = 564 authored engineering artifact mappings**. It is a content-design companion to the Full-Mesh Workflow document, not a replacement for it.
 
 Each outline is intentionally scoped so adjacent artifacts remain authoritative for their own concerns. When another document owns information, the engineering document should carry a **traceable reference** rather than copied narrative. This prevents contradictory requirements, duplicated design truth, and review fatigue.
 
@@ -21,6 +21,10 @@ Each outline is intentionally scoped so adjacent artifacts remain authoritative 
 - **ISO/IEC/IEEE 42010:2022** concepts are used for architecture descriptions: explicit entity/scope, stakeholders and concerns, viewpoints/models, architecture decisions, and correspondence across views.
 - **ISO/IEC 25010:2023** is used as a quality-model reference for measurable product/software quality characteristics and subcharacteristics.
 - **NIST SP 800-218 (SSDF) 1.1** informs secure-development content, provenance, vulnerability reduction, and integration of security practices across the SDLC.
+- **NIST SP 800-161 Rev. 1 (updated 2024)** informs hardware/supplier availability, authenticity, lifecycle, supportability, and ICT supply-chain risk considerations when physical components are selected or substituted.
+- **DMTF Redfish** is used as a reference for vendor-neutral hardware inventory/telemetry/manageability expectations where supported; it is not mandatory for devices that do not implement Redfish.
+- **Manufacturer platform documentation and validated compatibility/support matrices** are authoritative for CPU/RAM/GPU/storage/NIC/firmware/slot/power/form-factor compatibility; unverified compatibility assumptions must be labeled and validated before baseline.
+- **Measured workload evidence** is preferred over speculative over-sizing: CPU, memory, accelerator, I/O, network, storage, power and thermal headroom should be tied to workload classes, concurrency, failure tolerance and expansion triggers.
 - **NIST AI RMF 1.0** is used for validity/reliability, transparency, explainability, privacy, fairness, monitoring, and risk controls when scoring, similarity, forecasting, recommendation, or other AI/ML-assisted decision systems are used.
 - **ISO/IEC 25012:2008** is used for data-quality characteristics and data-quality evaluation where opportunity, demographic, market, forecast, provenance, or calibration data drive decisions.
 - **W3C PROV-DM / PROV-O** are used as provenance-model references for entities, activities, agents, derivation, attribution, versioning, and reproducibility of evidence and assumptions.
@@ -26823,6 +26827,194 @@ Every SE25 artifact should record, when applicable:
 ---
 
 
+
+# SE11 Hardware Planning Extension
+
+The following three artifacts are first-class SE11 engineering artifacts. They do **not** create a procurement function. Their purpose is to let the Infrastructure, Containers & Runtime Engineering owner consume the authoritative hardware strategy/BOM already present in the Master Product Vision, validate the specifications and current hardware availability/compatibility from an engineering perspective, and convert that source information into a coherent physical-infrastructure design that is traceable to workload and capacity requirements.
+
+## Hardware-source ingestion rule
+
+- The **Master Product Vision hardware strategy and BOM** are authoritative upstream inputs to SE11. The workflow must distribute the exact current vision version (or a versioned hardware/BOM extract that points back to it) to SE11 during Engineering Lead intake.
+- SE11 **must not silently treat listed hardware as immutable architecture**. SE11 validates that the specified hardware remains technically compatible, supportable, available enough for the planned implementation sequence, and sufficient for current capacity/reliability goals.
+- If a listed component is unavailable, superseded, incompatible, or materially suboptimal, SE11 documents the engineering impact and proposes an equivalent or better specification class. **Procurement/vendor negotiation remains outside SE11.**
+- NT16 may provide vendor/availability/support/warranty facts, while SP16 may provide cost guardrails; neither domain owns SE11's technical sizing or architecture.
+- Any substitution that changes performance, capacity, topology, power, thermal, reliability, security, portability, or delivery assumptions reopens the affected cross-domain review path.
+
+---
+
+### 562. SE11 - Physical Infrastructure & Hardware Architecture
+
+**Purpose:** Define the authoritative physical-hardware architecture for the platform when local/on-premises infrastructure is used, translating the Master Product Vision hardware strategy/BOM and approved runtime requirements into a coherent physical compute, storage, accelerator, network, power, rack/placement, management, and failure-domain design.
+
+**Workflow routing metadata**
+
+- **Originating domain(s):** Master Product Vision hardware strategy/BOM; PM09; SE11; Engineering Lead architecture; SE01 capacity inputs; SE12 storage inputs; SE19 performance/resilience inputs; SE20 operations inputs; applicable NT16/SP16 facts and constraints
+- **Authoring domain:** SE11 - Senior Engineer - Infrastructure, Containers & Runtime Engineering
+- **Required reviewing domains:** EL, PJL, PM09, SE01, SE10, SE12, SE14, SE17, SE19, SE20, SE21, NT16, SP16
+- **Required cross-reference domains:** Engineering Lead Infrastructure/Runtime Architecture; Environment & Deployment Architecture; SE01 capacity/scaling model; SE12 storage architecture/capacity; SE17 infrastructure security; SE19 capacity/resilience validation; SE20 operations; Project Lead dependency/schedule plan; Master Product Vision hardware/BOM baseline
+- **Approval / sign-off:** SE11, EL, PM09; Project Lead accepts schedule/dependency implications; Product Lead disposition required only if a technical change alters an approved product constraint
+- **Downstream consuming domains:** PJL, EL, SE01, SE10, SE12, SE14, SE17, SE19, SE20, SE21, SE18, PM09
+- **Workflow stage(s):** 3 Engineering intake source distribution; 4 Draft; 5 Engineering cross-reference; 6 Cross-faction review where product/cost/availability assumptions change; 7 Feasibility/architecture review; 8 Tradeoff update; 9 Convergence; 11 Baseline; 12-17 consume/execute/verify; 18 evidence
+
+**Best-practice standards / references**
+
+- **ISO/IEC/IEEE 42010:2022** for architecture boundaries, stakeholder concerns, viewpoints, correspondence and decision rationale.
+- **ISO/IEC 25010:2023** for quality characteristics that the physical design must enable, including performance efficiency, reliability, security, maintainability and portability where applicable.
+- **NIST SP 800-161 Rev. 1** for ICT supply-chain risk considerations affecting component trust, lifecycle, authenticity, supportability and substitution risk.
+- **NIST SP 800-218** for secure engineering and traceable integration of infrastructure components into the SDLC.
+- **DMTF Redfish** as a vendor-neutral manageability/telemetry reference where hardware supports it.
+- Current manufacturer documentation, compatibility matrices, firmware/support bulletins and engineering specifications are authoritative for hardware compatibility.
+
+**Recommended content outline**
+
+1. **Authoritative source baseline:** exact Master Product Vision version/sections containing hardware strategy and BOM; identify which entries are fixed constraints, preferred targets, optional items or candidates subject to engineering validation.
+2. **Physical architecture scope and boundaries:** local compute, worker nodes, GPU/accelerator class, storage/NAS, network switching/NICs, rack/placement, UPS/power distribution, cabling, out-of-band/management capabilities, and excluded facilities/procurement concerns.
+3. **Workload-to-hardware allocation:** map platform core, data, build/CI, validation/staging, agent execution, test/scanning and other workload classes to physical resource pools without prematurely coupling application logic to named devices.
+4. **Compute architecture:** CPU, memory, accelerator, PCIe/slot, local NVMe and host-role requirements; virtualization/host implications and resource-reservation constraints.
+5. **Storage architecture:** hot-working storage, durable storage, backup/isolated-copy roles, bandwidth/IOPS/latency assumptions, RAID/replication boundaries, recovery expectations and capacity headroom.
+6. **Network architecture:** uplink/link-speed requirements, switching/core roles, east-west artifact/data traffic, bottleneck avoidance, management segmentation and expansion ports/headroom.
+7. **Physical power/placement architecture:** UPS/power-domain relationships, circuit/load assumptions, rack/desk/room placement constraints, device power envelopes and safe shutdown dependencies; detailed electrical work remains outside SE11.
+8. **Failure-domain design:** central host, worker pool, storage, switch, UPS/circuit, internet/external-AI dependency and management-plane failure implications.
+9. **Hardware manageability/operability:** inventory identity, firmware/BIOS/driver lifecycle, telemetry, health status, remote-management capabilities where available, monitoring integration and maintenance windows.
+10. **Compatibility/availability assessment:** validate BOM components against current manufacturer support, form factor, slot/power/firmware/OS/virtualization requirements and current practical availability; record alternatives by specification class rather than procurement preference.
+11. **Security considerations:** trusted boot/firmware, management interfaces, physical/administrative access, storage encryption support, secure firmware/driver update path and supply-chain/security constraints.
+12. **Expansion model:** planned spare ports/bays/slots/capacity, scale-out versus scale-up boundaries, and triggers that would require architecture revision rather than simply adding hardware.
+13. **Architecture risks/ADRs:** hardware coupling, single points of failure, lifecycle/support windows, vendor dependency and substitute-component rules.
+14. **Validation/evidence plan:** compatibility checks, inventory verification, burn-in/performance/resilience tests, telemetry checks and baseline acceptance evidence.
+
+**Keep out of this document**
+
+- Purchase orders, price negotiation, vendor-selection scorecards or procurement workflow.
+- Project-owned acquisition dates except referenced dependency windows.
+- Detailed software/container/service design already owned by existing SE11 artifacts.
+- Unverified assumptions presented as confirmed hardware facts.
+
+**Completion / quality gate**
+
+- The exact vision hardware/BOM source version is identified and every adopted/deviated item has an engineering disposition.
+- Compute, storage, network, power/placement and management relationships form one coherent physical architecture.
+- Current compatibility and practical availability have been checked sufficiently to avoid baselining impossible or obsolete combinations.
+- No material single point of failure, capacity limit or hardware dependency is hidden.
+- Substitution rules preserve required performance, reliability, security, portability and schedule assumptions.
+- Validation evidence and affected cross-domain owners are explicit.
+- Sign-off is recorded against the exact baseline consumed downstream.
+
+---
+
+### 563. SE11 - Hardware Capacity, Sizing & Growth Model
+
+**Purpose:** Convert approved workload, concurrency, throughput, reliability and lifecycle requirements into measurable physical CPU, memory, accelerator, storage, I/O, network and reserve-capacity requirements, while reconciling those requirements with the hardware classes defined in the Master Product Vision.
+
+**Workflow routing metadata**
+
+- **Originating domain(s):** Master Product Vision hardware strategy/BOM; SE01 Core Platform Capacity & Scaling Model; PM09; SE11; SE12 data/storage capacity; SE19 performance/capacity requirements; SE20 operating telemetry; Engineering Estimate & Capacity Model
+- **Authoring domain:** SE11 - Senior Engineer - Infrastructure, Containers & Runtime Engineering
+- **Required reviewing domains:** EL, PJL, PM09, SE01, SE10, SE12, SE17, SE19, SE20, SP16
+- **Required cross-reference domains:** SE01 scaling model; SE12 database/storage capacity; SE19 Capacity/Scalability Benchmark Plan; SE20 Operational Capacity/Cost Monitoring Plan; EL Engineering Estimate & Capacity Model; Project Lead Resource & Capacity Plan; Physical Infrastructure & Hardware Architecture
+- **Approval / sign-off:** SE11, EL, PM09; SE19 validates benchmarkability; Project Lead consumes sizing-dependent lead-time/dependency inputs
+- **Downstream consuming domains:** PJL, EL, SE01, SE10, SE12, SE17, SE19, SE20, SE18, PM09, SP16
+- **Workflow stage(s):** 3-4 ingest/model; 5 cross-reference; 7 feasibility review; 9 convergence; 11 baseline; 12-17 update from actual telemetry; 18 evidence
+
+**Best-practice standards / references**
+
+- **ISO/IEC 25010:2023** for performance efficiency, reliability and capacity-related quality goals.
+- **ISO/IEC/IEEE 42010:2022** for keeping sizing assumptions traceable to architecture concerns and decisions.
+- Manufacturer specifications and validated benchmark/telemetry evidence for hardware limits.
+- Measured platform workload data takes precedence over unsupported theoretical sizing once representative data exists.
+
+**Recommended content outline**
+
+1. **Sizing scope and source requirements:** workload classes, throughput objectives, concurrent builds/apps/agents, validation load, retention/data-growth assumptions, SLOs and failure tolerance.
+2. **Workload demand model:** CPU cores/utilization, memory working set, GPU/VRAM/accelerator demand, local storage capacity/IOPS/latency, durable-storage growth, network throughput and burst behavior.
+3. **Baseline hardware classes from the vision:** map the current central-node, worker, storage, networking and optional-accelerator targets to measurable capacity units without assuming every listed quantity must be purchased immediately.
+4. **Steady-state vs burst vs failure-mode capacity:** normal demand, validation/release peaks, failed-node/headroom requirements and queueing tolerance.
+5. **Reservation/headroom policy:** operating reserve for OS/hypervisor, databases, build cache, validation workloads, failover and growth; prohibit using nominal maximum capacity as safe usable capacity.
+6. **Scale-up/scale-out thresholds:** measurable utilization/queue/latency/storage/network thresholds that trigger memory/storage/GPU/network upgrade, worker expansion, workload redistribution or architectural review.
+7. **Storage growth model:** hot-working set, artifact/cache growth, backup/history, retention effects, usable-versus-raw capacity and restore/recovery considerations.
+8. **Network capacity model:** concurrent artifact movement, backup, database, image/container and worker traffic; uplink/core/shared-storage bottleneck thresholds.
+9. **Power/thermal envelope inputs:** expected and peak hardware draw by class for capacity validation and safe placement; this is engineering sizing input, not electrical-contractor design.
+10. **Sensitivity analysis:** how workload, concurrency, model-provider strategy, local-vs-external AI, retention or validation depth changes the hardware requirement.
+11. **Historical calibration:** replace assumptions with observed build times, queueing, utilization, I/O and network measurements as the platform matures.
+12. **Sizing confidence/limitations:** data quality, benchmark representativeness, unknowns and explicit uncertainty.
+13. **Capacity decision table:** current required capacity, provisioned capacity, headroom, trigger, next action and owner.
+14. **Evidence/benchmark linkage:** every critical sizing assumption links to SE19/SE20 measurement evidence or a documented pre-measurement estimate.
+
+**Keep out of this document**
+
+- Procurement/vendor negotiation and purchase approval.
+- Project staffing or non-hardware resource capacity.
+- Application-level commercial scaling decisions owned outside Engineering.
+- Exact benchmark procedures already owned by SE19.
+
+**Completion / quality gate**
+
+- Every hardware quantity/capability traces to a workload, quality, resilience or growth requirement.
+- Normal, burst and degraded/failure demand are distinguished.
+- Safe usable capacity and required reserve are explicit.
+- Scale-up/scale-out triggers are measurable and tied to downstream actions.
+- The model reconciles with current vision hardware classes and records where evidence requires a different technical target.
+- Actual telemetry supersedes old estimates through controlled recalibration.
+
+---
+
+### 564. SE11 - Power, Cooling, Rack & Network Physical Design
+
+**Purpose:** Define the physical implementation constraints and relationships needed to operate the selected local hardware safely and reliably, including device placement, rack/space use, network physical topology, cabling, UPS/power distribution, shutdown sequencing, thermal/airflow assumptions and expansion headroom.
+
+**Workflow routing metadata**
+
+- **Originating domain(s):** Master Product Vision hardware/BOM and physical-infrastructure strategy; SE11 Physical Infrastructure & Hardware Architecture; SE11 Hardware Capacity/Sizing Model; SE14 network/interface dependencies; SE17 security; SE19 resilience/performance; SE20 operations; PM09
+- **Authoring domain:** SE11 - Senior Engineer - Infrastructure, Containers & Runtime Engineering
+- **Required reviewing domains:** EL, PJL, PM09, SE01, SE12, SE14, SE17, SE19, SE20, NT16 where manufacturer/vendor support facts are material
+- **Required cross-reference domains:** Physical Infrastructure & Hardware Architecture; Hardware Capacity/Sizing Model; Environment & Deployment Architecture; Reliability/Resilience Architecture; SE19 failure-injection/capacity validation; SE20 operations/runbooks; Master Product Vision hardware/BOM baseline
+- **Approval / sign-off:** SE11, EL, PM09; qualified electrical/facilities expertise must validate any work that changes building circuits or requires code-regulated installation
+- **Downstream consuming domains:** PJL, EL, SE10, SE12, SE14, SE17, SE19, SE20, SE18, PM09
+- **Workflow stage(s):** 4 Draft; 5 cross-reference; 7 feasibility/architecture review; 9 convergence; 11 baseline; 14 implementation planning; 15-17 installation/integration/verification; 18 evidence
+
+**Best-practice standards / references**
+
+- Manufacturer environmental, airflow, mounting, power and operating specifications are authoritative for the selected devices.
+- **ISO/IEC/IEEE 42010:2022** for physical/deployment viewpoints and relationship to logical architecture.
+- **NIST SP 800-161 Rev. 1** where supply-chain/support substitutions can alter physical design or operational risk.
+- **DMTF Redfish** is a manageability/telemetry reference where compatible hardware exposes supported power/thermal/health data.
+- Any building electrical work, circuit modification or code-regulated installation must be validated by appropriately qualified professionals; this engineering artifact does not replace electrical/building-code design.
+
+**Recommended content outline**
+
+1. **Source baseline:** exact vision/BOM sections defining existing power, rack, network, storage and hardware assumptions; record engineering dispositions.
+2. **Physical layout:** device placement, rack/desk/room topology, form factors, rack units/trays/shelves, service clearances, cable routes and maintenance access.
+3. **Network physical topology:** switch/uplink placement, port/link-speed plan, NIC/media/cable requirements, storage/control/data path separation where needed, spare ports and expansion path.
+4. **Power topology:** devices by UPS/PDU/power domain, nominal/expected/peak draw inputs, outlet/connectivity requirements and protection boundaries.
+5. **Graceful shutdown/restart dependencies:** UPS monitoring, host/storage shutdown order, service dependencies and recovery sequencing.
+6. **Circuit/load assumptions:** document the load envelope and required independent power domains from an engineering perspective; identify where qualified electrical validation is required before installation.
+7. **Thermal/airflow assumptions:** device heat/load considerations, intake/exhaust clearance, enclosure/rack spacing, ambient operating limits and conditions that require measurement or cooling changes.
+8. **Failure-domain separation:** identify common-mode failures introduced by one switch, UPS, circuit, rack location, storage system or management path.
+9. **Physical security/management:** access, tamper considerations, console/management connectivity and recovery access.
+10. **Cabling/labeling/inventory standard:** port/device/power identifiers, cable class/length constraints and traceable physical inventory.
+11. **Expansion headroom:** unused rack/port/bay/power/network capacity and the trigger for adding or redesigning physical infrastructure.
+12. **Availability/substitution impact:** evaluate whether currently available replacement components preserve physical dimensions, power, cooling, interface and network requirements.
+13. **Installation acceptance checks:** inventory match, link negotiation, storage/network throughput sanity checks, UPS signaling, shutdown behavior, thermal observations, firmware/health status and no unexpected overload/bottleneck.
+14. **Risks/exceptions:** unsupported cabling/power assumptions, single points of failure, thermal concerns, unavailable components or facility constraints and their dispositions.
+
+**Keep out of this document**
+
+- Procurement approvals, vendor bidding, purchasing schedules or commercial negotiation.
+- Building electrical design beyond stating load/availability requirements and required professional validation.
+- Detailed logical network/security policy already owned by SE14/SE17.
+- Application/service placement detail already owned by runtime/deployment artifacts except where needed to size physical paths.
+
+**Completion / quality gate**
+
+- Physical layout, network, power, shutdown and thermal assumptions are mutually consistent with the selected hardware.
+- Required component interfaces/form factors/power envelopes are compatible with the current BOM or documented substitute class.
+- No circuit/UPS/switch/storage/rack common-mode dependency is hidden.
+- Any facility/electrical assumption requiring qualified validation is clearly flagged before implementation.
+- Installation acceptance and operational monitoring evidence are defined.
+- Expansion headroom is deliberate and measured rather than speculative overbuild.
+
+---
+
+
 # Appendix — Artifact Count Reconciliation
 
 - Engineering Lead authored mappings: **29**
@@ -26830,8 +27022,8 @@ Every SE25 artifact should record, when applicable:
 - SE23 Governance Automation & Policy-as-Code Engineering mappings: **9**
 - SE24 Data Quality & Evolution Assurance mappings: **10**
 - SE25 Opportunity Intelligence & Commercial Decision Systems Engineering mappings: **12**
-- Senior Engineering domain authored mappings after 25-gap integration: **532**
-- Total engineering authored mappings: **561**
+- Senior Engineering domain authored mappings after 25-gap + hardware-planning integration: **535**
+- Total engineering authored mappings: **564**
 
 The 532 Senior Engineering mappings include shared core artifact classes repeated for each applicable engineering ownership domain plus domain-specific specialist artifacts. Repetition is intentional because each domain authors its own authoritative instance and participates in its own review/sign-off mesh.
 
@@ -26841,10 +27033,13 @@ The 532 Senior Engineering mappings include shared core artifact classes repeate
 - SE23 artifacts: **531-539**
 - SE24 artifacts: **540-549**
 - SE25 artifacts: **550-561**
-- Complete continuous range: **1-561**
+- SE11 hardware-planning extension artifacts: **562-564**
+- Complete continuous range: **1-564**
 
 ## 25-gap completeness rule
 
 For every applicable product or platform capability, the engineering package is incomplete if an SP01-SP22 or SE23-SE25 trigger applies but the corresponding reviewer, cross-reference, validation, evidence, or exception disposition is absent. Applicability is traceable and auditable; absence of a specialist artifact/review must be justified as N/A rather than silently omitted.
 
 For SE25 specifically, the package is incomplete unless the architecture, state model, scoring, uniqueness, provenance, forecasting/calibration, assumption-graph, watchlist scheduler, market-validation integration, pre-build readiness, observability/audit, and test/evaluation concerns are each either represented by their canonical artifact or explicitly marked not applicable with approved rationale.
+
+For local/on-premises physical infrastructure, the package is also incomplete unless the current Master Product Vision hardware/BOM source has been explicitly ingested by SE11 and the Physical Infrastructure & Hardware Architecture, Hardware Capacity/Sizing & Growth Model, and Power/Cooling/Rack/Network Physical Design are either completed or explicitly marked N/A with approved rationale.
