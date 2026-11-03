@@ -1041,3 +1041,111 @@ No upstream product, EL, NT16 or SP16 document was available to check (§0.1); n
 | Provided contracts | `SE11-CONTRACT-hardware-baseline@1`, `SE11-CONTRACT-hardware-signals@1` — **DEFINED, REGISTRATION PENDING** (§18.2; SE11-DEP-02, SE11-DEP-11) |
 | Sign-off | SE11 (author): architecture dispositions complete at PROVISIONAL status, pending SE11-AC-11 and SE11-AC-01; the two open findings are stated, not closed. EL review: **not performed** (documents absent). SE01/SE12/SE17/SE19/SE20 inputs: unmet dependencies (§18.3), none received |
 
+
+## 18. Cross-domain dependencies and interface contracts (corrects finding 003)
+
+### 18.1 Dependencies by owning role
+
+| Owning role (§74) | What is needed from / supplied to them | Dependency id | Needed by |
+|---|---|---|---|
+| PL | Register ids for the §0.5 crosswalk | SE11-DEP-01 | SE11-AC-11 |
+| EL | Reference this document (not duplicate) in system/runtime/deployment/reliability/estimate documents; bind services to pools (§4); consume `SE11-CONTRACT-hardware-signals@1` in the scheduler; review ADR-01 … 12; register both provided contracts in EL's register; accept FD-HOST/FD-EXT-AI/FD-RESTART residuals; include SE11-REQ-13/17/18 in Definition of Ready for data-bearing services | SE11-DEP-02 | SE11-AC-11 |
+| SE01 | Capacity model: per-pool demands for §5.3 Step 0, queue-wait thresholds for TRG-WKR-LOCAL, shedding thresholds for the SE11-DEC-11 signals, B_floor confirmation (ASM-SE11-12), replacement of ASM-SE11-03 | SE11-DEP-03 | SE11-DEC-03a; Stage 1 end |
+| SE12 | Dataset classification (replaces ASM-SE11-08), retention volume V for §6.7, binding RPO/RTO, A_max/G (replaces ASM-SE11-10), backup schedule, T3 and T3-SUB policy, **creation-gate and write-freeze enforcement in the DB/EVID stores (SE11-REQ-18)**, abrupt-loss integrity verification, key custody with SE17 | SE11-DEP-04 | SE11-DEC-06a; SE11-AC-07a/b/c/d; SE11-AC-13 |
+| SE17 / SE15 | Control ids for SE11-SECREQ-01 … 08 (column b); segmentation policy between `seg.*`; key custody and the offline custody secret for KEYS; T3-SUB custody; KEYS gate enforcement (SE11-REQ-18); SE11-AC-08b evidence | SE11-DEP-05 | Stage 1 (host/NAS), Stage 3 (full) |
+| SE19 | Execute SE11-AC-04/05/12/12b/13 and the §9 resilience tests; replace ASM-SE11-09/12 with measurements | SE11-DEP-06 | Stage 1–2 |
+| SE20 | Subscribe to `SE11-CONTRACT-hardware-signals@1` for monitoring (SE11-AC-09), maintenance windows, firmware execution, drills SE11-AC-06/07c/07d/13/14/15, inventory upkeep, admission checklist for SE11-REQ-13/17/18, T3-SUB operation | SE11-DEP-07 | Stage 1 |
+| SP16 | Economics input for gate G-LOCAL (ADR-01) and Step 2 of §5.3 | SE11-DEP-08 | Before any local provisioning decision |
+| NT16 | External-provider and hosted-equivalent risk/SLA input for FD-EXT-AI, FD-INTERNET, N-C/M-C, T3 provider | SE11-DEP-09 | Before T3 provider and hosted-equivalent decisions |
+| EL (NFR specification) | NFR ids to bind SE11-NFR-01 … 08 | SE11-DEP-10 | SE11-AC-11 |
+| SE11 (own, separate tasks) | SE11-INTERFACE-CONTRACT (registers both provided contracts), SE11-HARDWARE-CAPACITY-SIZING (applies §5.3/§6.7; records SE11-DEC-03a/06a) and SE11-POWER-COOLING-RACK (thermal, rack layout, PD details) | SE11-DEP-11 | Stage 1 |
+| SE14 | Portable naming/addressing conventions for pools and segments (no physical design) | consultation (no contract needed) | Stage 1 |
+| Qualified electrician | Circuits verification and any installation (SE11-REQ-10) | SE11-DEP-12 | Before stable-runtime baseline |
+
+### 18.2 Provided contracts — definitions of record (status: DEFINED, REGISTRATION PENDING)
+
+**Registration status, stated plainly.** Registration requires two artefacts that do not exist in this run: SE11's Interface Contract document (SE11-DEP-11) and EL's contract register in EL-INTERFAC-CONTRACT-GOVERNAN (SE11-DEP-02). SE11 cannot create either from this task and does not pretend to. The contracts are therefore **defined here, normatively**, and the registration record below is pre-filled so that registration is a transcription. Until both entries exist, every consumer cites "`<contract id>` as defined in SE11-PHYSICAL-INFRASTR-HARDWARE v4 §18.2, registration pending" and carries that status. The definitions are complete enough to implement against; registration adds discoverability and governance, not content.
+
+**Registration record (to be transcribed verbatim into SE11-INTERFACE-CONTRACT and EL's register):**
+
+| Field | Part A | Part B |
+|---|---|---|
+| Contract id | `SE11-CONTRACT-hardware-baseline@1` | `SE11-CONTRACT-hardware-signals@1` |
+| Owner | SE11 | SE11 |
+| Defining text | this document v4 §18.2 Part A | this document v4 §18.2 Part B |
+| Kind | Versioned record (file) | Metrics endpoint + cursor-based event log |
+| Consumers | EL (runtime/deployment/reliability/estimate documents), SE01, SE12, SE14, SE17, SE19, SE20, Stage-14 plans | EL scheduler, SE01, SE12/SE17/SE15 data-store gates, SE20 monitoring, SE19 |
+| Status | DEFINED — REGISTRATION PENDING | DEFINED — REGISTRATION PENDING |
+| Compatibility rule | Additive fields only within major 1; any change to a disposition, mapping, budget rule, state definition or status ladder is major 2 | Additive metrics/fields/labels within major 1; renaming or removing a signal, changing a state enum or the delivery/failure semantics is major 2; consumers pin the major |
+
+**Part A — `SE11-CONTRACT-hardware-baseline@1` (the hardware-baseline record).** One version-controlled file in `REPO` (path fixed by the host build and recorded in the inventory), schema version `1`, containing per asset: the §10.1 inventory fields; class disposition, part-number evidence status, quantity status and candidate selected (§1.2, §5.3, §6.7); failure-domain ids (§9); pool ids and CPU budgets (§4) with the Table 5.3-R memory lines of the installed candidate and the Req computation; volume mapping (§6.1, Mapping-D/V) and the §6.1a row in force with D2/S2/L2, V_min, B_max, B_floor and the per-device shares; per-class protection defaults A_max/G and the enforcing store per class (§6.3); signalling topology S-x and restart mechanism M-x/N-x (§8.3) with B_u, R_u, D_off and the measured timing constants; the SE11-DEC-11 signal catalogue version; baseline status (§17 ladder) and open gaps; evidence ids (§14); configuration fingerprint (v0/v1). Consumers cite this record and the status they rely on; they never restate hardware facts.
+
+**Part B — `SE11-CONTRACT-hardware-signals@1` (metrics and events).**
+
+| Aspect | Specification |
+|---|---|
+| Transport | (1) **Metrics**: HTTP pull endpoint on `seg.mgmt` (address and port in Part A), text exposition, every metric prefixed `se11_hw_`, labels `inv` (inventory id), `pool`, `class` as applicable; sample interval ≤ 60 s; served by the SE11 host agent on the host OS, independent of any VM. (2) **Events**: an append-only log on the host (M2_1) exposed by the same endpoint as `/events?since=<seq>`; consumers poll with their last `seq` (cursor); no broker or bus is designed (BND-03) |
+| Event record | `seq` (uint64, monotonic, gap-free per host boot epoch; `epoch` increments at each host boot so consumers detect restarts), `ts` (UTC, RFC 3339), `signal` (enum: `SIG-ONBATTERY`, `SIG-SHUTDOWN`, `SIG-THERMAL`, `SIG-STORAGE-PRESSURE`, `SIG-PROTECTION-STATE`, `SIG-PL-STATE`, `SIG-RESTART`), `edge` (`SET` / `CLEAR` / `HEARTBEAT`), `source` (inventory id), `payload` (fixed per signal, below) |
+| Payloads | `SIG-ONBATTERY`: {ups, state S0/S1, charge %, runtime_estimate_s}. `SIG-SHUTDOWN`: {candidate S-x, t0, budget_s} — semantics: no further scheduling will be honoured; jobs have ≤ 60 s. `SIG-THERMAL`: {inv, sensor, value, limit}. `SIG-STORAGE-PRESSURE`: {inv or volume, used %, tbw %, summed_build_iops, b_max, v_min}. `SIG-PROTECTION-STATE`: {class c, state ∈ MECH-UNVERIFIED/ARMED/PROTECTED/DEGRADED-IN-BUDGET/EXPIRED, kind ∈ ANCHOR/COPY/none, mech_ok, t3_last_ok, age_s, a_max_s, g_s, t3sub_age_s or null}. `SIG-PL-STATE`: {state ∈ PL-0/PL-T2/PL-T3-PENDING/PL-T3/PL-DEG/PL-EXP}. `SIG-RESTART`: {mechanism, event ∈ ARMED/FIRED/WAKE-ONLINE/WAKE-ONBATTERY/OUTPUT-OFF/AC-APPLIED, t_restart_s when known} |
+| Delivery guarantee | An event is appended within **60 s** of the condition (SE11-DEC-11). Every level signal is **level-triggered with explicit SET/CLEAR and re-asserted by a HEARTBEAT every 300 s**, so a consumer that missed an edge recovers the level within 300 s. At-least-once from the consumer's cursor; idempotent by (`epoch`, `seq`) |
+| Failure semantics | If the endpoint is unreachable or no HEARTBEAT arrives for **180 s**, consumers must mark every SE11-published level **STALE**. Required default while STALE (consumers may be stricter, never laxer): protection states are treated as unknown → **no new real D-IRR dataset may be created** (SE11-REQ-13 cannot be evaluated); PL state treated as unknown for SE11-AC-10 purposes; scheduler policy on STALE is EL's (placed requirement CI-1). Sequence gap or epoch change → consumer re-reads from the last acknowledged cursor and re-evaluates levels from the next HEARTBEAT. Host down (FD-HOST) → STALE by construction; the NAS, switch and UPS have no independent publisher |
+| Security | Endpoint reachable only from `seg.mgmt`; read-only; carries no workload content (SE11-SECREQ-08, checked in SE11-AC-09); authentication: a bearer token rotated at commissioning as the baseline control, replaced by SE17's control when mapped (SE11-DEP-05) |
+| Conformance | SE11-AC-09 (SE11's part): all §10.3 metrics present, event semantics as above, STALE detectable by a test consumer |
+
+### 18.3 Consumed cross-domain behaviours — SE11's side specified, owner's side placed and UNMET
+
+No owner has published a contract id in this run (§0.1); none is invented. Each behaviour this architecture relies on is split into **SE11's side** (specified in this document; implementable now) and the **owner's side** (a placed requirement with owner, needed stage and the consequence while unmet). A dependency label is not closure: the "Status" column says UNMET wherever the owner's part does not exist.
+
+| Id | Behaviour | SE11's side (specified here) | Owner's side (placed requirement) | Status | Consequence while unmet |
+|---|---|---|---|---|---|
+| CI-1 | Scheduler consumes the hardware signals and sheds work | Part B signals with delivery/failure semantics; default shedding expectation (§4) | EL/SE01 (SE11-DEP-02/03): subscribe with a cursor; shedding policy per signal; STALE policy; thresholds | UNMET | Signals are published to no consumer; shutdown safety does not depend on it (the UPS sequence stops VMs regardless, §8.3); only efficiency and in-flight-work loss are affected |
+| CI-2 | Creation gate, mutation rule and write-freeze per D-IRR class | Part B protection fields; `REPO` enforced by SE11; state machine §6.3; SE11-AC-07d step for REPO | SE12 (`DB`, `EVID` storage, **write-freeze**), SE17/SE15 (`KEYS`), EL (Definition of Ready), SE20 (checklist) — SE11-REQ-18, SE11-DEP-02/04/05/07 | UNMET (REPO part: met by SE11) | Only `REPO` can legally hold real D-IRR data; `PL-T3` cannot be reached for other classes; SE11-AC-07c/d owner criteria pending; no false integration claim |
+| CI-3 | Monitoring integration and alerting | Part B endpoint and event log; SE11-AC-09 conformance | SE20 (SE11-DEP-07): subscribe, dashboards, §12.2 thresholds, drill scheduling | UNMET | SE11's host agent still raises its own local alert for E4/S1 and writes the event log; nobody is paged; FD-SIGNAL detection ≤ 300 s is met only at the agent |
+| CI-4 | Security control mapping and policies | §13 column (a) checks, SE11-AC-08a; `seg.*` design; baseline token auth on the exporter | SE17/SE15 (SE11-DEP-05): column (b) control ids, inter-segment policy, key custody, offline custody secret for KEYS | UNMET | SE11-AC-08a can pass; SE11-AC-08b cannot; KEYS cannot leave MECH-UNVERIFIED without the custody secret |
+| CI-5 | Test execution and evidence format | Test specifications with pass criteria (§14) | SE19 (SE11-DEP-06): execute SE11-AC-04/05/12/12b/13 and §9 resilience tests | UNMET | Tests specified, not executed; §6.1a and §6.4 keep their default percentages |
+| CI-6 | Capacity inputs | §5.3 procedure, Table 5.3-R, trigger definitions | SE01 (SE11-DEP-03): demands, thresholds, B_floor | UNMET | Default M-A/N-A under H.1/H.3; hypothetical allocations (ASM-SE11-03) |
+| CI-7 | Economics for local-versus-hosted | Gate G-LOCAL wording, Step 2 conditions | SP16 (SE11-DEP-08) | UNMET | Local-versus-hosted undecided per pool |
+| CI-8 | External-dependency assessment | FD-EXT-AI/FD-INTERNET dispositions from the seed | NT16 (SE11-DEP-09) | UNMET | Residuals stated from the seed only; T3 provider unselected |
+| CI-9 | Electrical verification | §8.2 load figures and the two-domain requirement | Licensed electrician (SE11-DEP-12) | UNMET | No stable-runtime baseline until on file |
+| CI-10 | Register reconciliation | §0.5 crosswalk | PL (SE11-DEP-01) | UNMET (finding 001 open) | Status PROV; not source-complete |
+| CI-11 | Contract registration and sibling SE11 artefacts | Pre-filled registration record (§18.2) | SE11's own later tasks (SE11-DEP-11) and EL's register (SE11-DEP-02) | UNMET | Contracts cited as "defined here, registration pending" |
+
+### 18.4 What is implementable from this document alone
+
+| Implementable now (SE11-owned, no owner contract needed) | Waits for an owner (placed, UNMET) |
+|---|---|
+| Pool and VM definitions with the §4 controls and the §5.2 admission formula; Table 5.3-R default M-A; the §5.3 procedure as a script in the sizing task | Demands from SE01; economics from SP16 |
+| Volume mapping D/V, `build.slice` layout, per-device shares and the limiter configuration for every §6.1a row; the calibration and feasibility computation; SE11-AC-12b | SE19 execution; B_floor confirmation |
+| Protection state machine, record fields, `REPO` hosted remote and gate; SE11-AC-07b fixture for REPO; SE11-AC-07d step (1) | Gates in DB/EVID/KEYS stores; A_max/G; write-freeze (SE12) |
+| UPS state machine, timed sequences, D_off per candidate, M1/M3 host agent logic including the wake-poll loop, N1 sender; SE11-AC-06/15 procedures | Vendor evidence (FC-09); SE20 drill execution; electrician |
+| Inventory file, fingerprint schema, Part A record, Part B exporter and event log, SE11-AC-09 conformance test | SE20 subscription; SE17 auth control |
+| §13 column (a) checks and SE11-AC-08a | Column (b) control ids |
+
+## 19. Criteria disposition
+
+| Criterion | Disposition | Where / reason |
+|---|---|---|
+| OUT-…-AR-01 source baseline | Covered | §1.1 (Rev 1.1, BOM v2.2, sha), §1.2 (B1–B19 with class/quantity/part-number-status separation); §0.5 crosswalk (preparation only — the register itself is absent, see the source row below) |
+| OUT-…-AR-02 scope and boundaries | Covered | §2 |
+| OUT-…-AR-03 workload allocation | Covered | §4 (pools, CPU budgets, shared-budget membership, weighted contention vs shedding via contract) |
+| OUT-…-AR-04 compute | Covered | §5 (accounting, Table 5.3-R, Req formula with the ordered deterministic procedure and four worked examples, GPU preconditions) |
+| OUT-…-AR-05 storage | Covered | §6 (mapping D/V, I/O budget identity and partition §6.1a, classes, protection states with bootstrap §6.3, recovery split, NAS candidates) |
+| OUT-…-AR-06 network | Covered | §7 (incl. NIC slot fallbacks) |
+| OUT-…-AR-07 power/placement | Covered | §8 (gated signalling, per-candidate timed sequences with D_off, wake-poll restart, derived timing budget, fail-closed) |
+| OUT-…-AR-08 failure domains | Covered | §9 (incl. FD-RESTART, FD-UPS-N, FD-INTERNET by copy-age) |
+| OUT-…-AR-09 manageability | Covered | §10 (telemetry as SE11's exporter contract) |
+| OUT-…-AR-10 compatibility/availability assessment | Covered | §11 — the assessment section exists and was performed to the limit of the corpus; its **result** is "not established" with open feasibility conditions FC-01 … FC-09 and no baseline selection (the quality criterion QC-AR-03 that asks for sufficiency is reported UNMET below) |
+| OUT-…-AR-11 security | Covered | §13 (SE11-executable checks; owner mapping is SE11-DEP-05) |
+| OUT-…-AR-12 expansion | Covered | §12 |
+| OUT-…-AR-13 risks/ADRs | Covered | §16 |
+| OUT-…-AR-14 validation plan | Covered | §14 |
+| QC-…-AR-01 exact source version; every item dispositioned | Covered | §1.1, §1.2 (status PROVISIONAL; dispositions at class level, part numbers deferred) |
+| QC-…-AR-02 one coherent physical architecture | Covered | §2.3, §4–§10 cross-referenced by pool, device, §6.1a row/mapping, segment, power-domain, candidate, failure-domain, protection-state and signal ids |
+| QC-…-AR-03 compatibility and availability checked sufficiently to avoid baselining impossible or obsolete combinations | **UNMET — reported `not_applicable`** | Reason line: the criterion cannot be met in this run because the evidence it requires (dated, attributable manufacturer support/availability evidence) does not exist in the allowed corpus; no coherent supported configuration has been demonstrated or selected (fingerprint v0: none); the outcome is tracked by FC-01 … FC-09 and SE11-AC-01; no closure is claimed (§0.3, §11.2, §11.3, §17) |
+| QC-…-AR-04 no hidden SPOF, capacity limit or dependency | Covered | §9 (incl. FD-RESTART, FD-SIGNAL, FD-MGMT), §12.1 hard ceilings, §12.3, §16.4, §18.3 placed/unmet behaviours, §17 open gaps |
+| QC-…-AR-05 substitution rules preserve assumptions | Covered | §11.4 classes; SE11-REQ-12; §6.1a admissibility and remedies; §12.3 ESCALATE boundaries; §8.4 ordered remedies |
+| QC-…-AR-06 validation evidence and affected owners explicit | Covered | §14 (owner, dependency id and gate per AC; SE11's own pass criteria separated from owners'), §18 (contracts defined with registration status; owners and unmet placed requirements) |
+| QC-…-AR-07 sign-off against the exact baseline consumed downstream | Covered | §17 (provisional sign-off bound to seed sha and the specification-class baseline; status ladder; open gaps listed; no fingerprint claimed) |
+| BND-01 … BND-04 | Covered (excluded as required) | §15 |
+
+**Required source PL-REQ-ID-REGISTER: UNMET SOURCE — reported `not_applicable`.** Reason line: the source could not be applied in this run because it does not exist in the repository (SE11-DEP-01); this is an open source gap, not a judgement that the source is irrelevant; the document is not source-complete and is not approved for implementation (§0.3, §17). The reported value asserts nothing about satisfaction.
