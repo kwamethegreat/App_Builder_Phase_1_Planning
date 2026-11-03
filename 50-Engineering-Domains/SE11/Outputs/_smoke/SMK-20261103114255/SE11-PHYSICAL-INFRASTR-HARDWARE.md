@@ -93,3 +93,105 @@ The seed states that Appendix G "is a greenfield reference configuration, not an
 | B19 | Local worker nodes (form factor and count unspecified; pool "may be local, hosted, cloud or hybrid", §168–§171) | Optional / evidence-sized | DEFER / OPTIONAL — hosted/cloud executors first (§160 "avoid premature local-compute constraints"); local class adopted on TRG-WKR-LOCAL | 0 at baseline | SE11-ADR-01 |
 
 **Tally (authoritative; supersedes any other count):** ADOPT ×2 (B2, B8); ADOPT WITH ENGINEERING CONSTRAINT ×13 (B1, B3, B4-class, B5, B6, B7, B9, B10, B12, B14-class, B15, B17-switch, B18); DEFER / OPTIONAL ×5 (B11, B13, B16, B17 rack/PDU/trays/shelf, B19); SUBSTITUTE ×0; ESCALATE ARCHITECTURE IMPACT ×0 at baseline (conditional REV-* triggers in §12.3). Two capacity figures (B4 quantity, B14 count) are CANDIDATES pending the sizing rules of §5.3 and §6.7. No substitution is silent: any future substitution is a new SE11-DEC entry with technical reason and impact (SE11-REQ-12).
+
+## 2. Physical architecture scope and boundaries (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-02)
+
+### 2.1 In scope (owned by SE11)
+
+| Element | Content of this document |
+|---|---|
+| Local central compute | One central node (B1–B10) as the reference configuration; host role, slot/lane allocation, reservation mechanism (§5) |
+| Worker nodes | Capability classes and placement rules for local workers if and when adopted (§4, §12); physical provisioning (trays, power, ports) when triggered |
+| GPU / accelerator class | Single-slot, ≤ 145 W, PCIe x16 class; deferred (§5.5) |
+| Storage / NAS | Hot NVMe tiers on the host, the durable NAS tier, and the physical mapping of every volume (§6) |
+| Network switching / NICs / physical segments | 10 GbE storage/core path, 5 GbE host onboard, switch class, VLAN membership and addressing of the physical segments (§7). Physical-network engineering is SE11's: §74 places SE14 in "API, Integration & Portability Engineering", not physical networking |
+| Rack / placement | 18U rack class; desk/room placement constraints (§8.5) |
+| UPS / power distribution | Two power domains, UPS roles, shutdown signalling and state machine (§8) |
+| Cabling | Cat6a for 10GBase-T paths; labelled per inventory id (§10.1) |
+| Out-of-band / management | Management path given the absence of a BMC on the consumer-class board (§10.2) |
+
+### 2.2 Out of scope (owned elsewhere; referenced, never included)
+
+| Concern | Owner (SEED-01 §74 unless stated) | How this document relates |
+|---|---|---|
+| Purchase orders, pricing, vendor scorecards, procurement workflow | nobody (chain rule) | §15 |
+| Electrical circuit design, breaker work, code compliance | Qualified electrical professionals | SE11-REQ-10 states the requirement only |
+| System, runtime, deployment and reliability architecture | EL | EL cross-references this document; EL's documents are unavailable in this version (§0.1) |
+| Capacity model and growth thresholds | SE01 (capacity concern) and SE11-HARDWARE-CAPACITY-SIZING (sizing) | §5.3 and §6.7 give candidate configurations and decision rules; the sizing document applies them |
+| Data policy: dataset classification, retention, backup schedule, binding RPO/RTO, key custody | SE12 (data), SE17 (security) | §6 states hardware-capable targets and a provisional default classification until SE12's document exists |
+| Portability and integration constraints on how pools are addressed (DNS names, no provider-specific assumptions) | SE14 | Consulted on §4/§7 naming; owns no physical design |
+| Security control catalogue and ids | SE17 (infrastructure/workload/data), SE15 (identity/crypto) | §13 lists SE11's requirements as SE11-SECREQ-nn to be mapped to owner control ids when those documents exist |
+| Performance/resilience test execution | SE19 | §14 lists the tests; SE19 executes and reports |
+| Operations, monitoring, maintenance windows | SE20 | §10 states telemetry and window requirements |
+| Software/container/service design | existing SE11 runtime artefacts and EL | BND-03: not restated |
+
+### 2.3 Context view (text)
+
+```mermaid
+flowchart LR
+  subgraph PD_A[Power domain A: UPS-A CP1500PFCLCD on circuit A]
+    HOST[Central host: Win11 Pro + Hyper-V\nVMs: Core + Data on M2_4 / Build-CI + Validation on M2_2\nM2_1 host system, M2_3 scratch]
+    NAS[NAS AS6808T: RAID 6 (count = candidate)\nsnapshots, backups, evidence, archives = T2]
+    SW[Managed switch: >=2x10GbE (>=4 preferred) + 1/2.5GbE access]
+  end
+  subgraph PD_B[Power domain B: rack UPS-B on circuit B - DEFERRED]
+    RACK[18U rack: PDU, worker trays - DEFERRED]
+    WK[Local workers - DEFERRED]
+  end
+  HOST -- L1 10GbE storage/backup --> SW
+  NAS -- L1 10GbE --> SW
+  HOST -- L2 5GbE mgmt + upstream --> SW
+  SW -- L5 uplink --> GW[Upstream gateway / internet]
+  GW --> EXT[External AI providers, hosted runners, hosted T3 copy]
+  WK -. L4 1/2.5GbE .-> SW
+  UPSA[UPS-A USB-HID] -- primary signal (gated, SE11-DEC-10) --> HOST
+  HOST -- network shutdown command (gated) --> NAS
+```
+
+## 3. Stakeholders, concerns and quality attributes (ISO/IEC/IEEE 42010 framing)
+
+| Stakeholder | Concern | Quality attribute (ISO/IEC 25010) | Measured by |
+|---|---|---|---|
+| EL | One coherent physical architecture to reference; contract to register | Compatibility, maintainability | §4–§10 cross-references; §18.2 contract definition |
+| SE01 | Capacity inputs as ranges with assumptions | Capacity | §5.3, §6.7, §12 |
+| SE12 | Durable tier, RAID/replication boundaries, recovery and protection rules | Reliability (recoverability, fault tolerance) | §6.3, §6.6, SE11-NFR-05, SE11-AC-07 |
+| SE14 | Pools addressed portably | Portability | SE11-REQ-05 |
+| SE17 / SE15 | Trusted boot, management isolation, encryption support | Security (confidentiality, integrity) | §13, SE11-AC-08 |
+| SE19 | Burn-in, contention, abrupt-loss and resilience test surface | Reliability (maturity), performance efficiency | §14 |
+| SE20 | Inventory identity, telemetry, maintenance windows, shutdown drills | Maintainability (analysability), reliability | §10, SE11-NFR-04 |
+| VP / platform operator (via PL) | Provision only justified capacity; portability; no temporary architecture (§158, §160, §233, §238) | Portability, cost | §1.2 dispositions, ADR-01 gate G-LOCAL, §12 triggers |
+
+**Measurable non-functional targets introduced by this document (status PROV; proposed for binding to EL-ENGINEER-NFR-SPECIFIC ids, which is unavailable; values are engineering proposals, ASM-SE11-06).**
+
+| NFR id | Quality attribute | Target (measurable) | Verified by |
+|---|---|---|---|
+| SE11-NFR-01 | Performance efficiency / reservation protection | Under the §14 contention profile (Build VM at 100 % of its vCPUs, Validation VM at 100 %, background saturating, backup transfer running): Core VM synthetic API probe p95 latency ≤ 1.5 × its unloaded baseline; Data VM synthetic 4 KiB random-read p99 ≤ 2 × unloaded baseline; Highest-priority VM CPU-wait ≤ 5 % in every 60 s window; throttling order observed = background → build → validation | SE11-AC-12 |
+| SE11-NFR-02 | Performance efficiency / storage path | Host↔NAS ≥ 0.7 GB/s sustained for 10 min during concurrent build-cache load; no other path degrades below 80 % of its unloaded throughput | SE11-AC-05 |
+| SE11-NFR-03 | Reliability / safe shutdown | Shutdown budget B (§8.3) ≤ 0.7 × measured UPS-A runtime R at measured PD-A load; every state transition completes inside its stated bound | SE11-AC-06, SE11-AC-14 |
+| SE11-NFR-04 | Maintainability / observability | 100 % of §10.3 signals exported, sample interval ≤ 60 s, retained for at least one stage | SE11-AC-09 |
+| SE11-NFR-05 | Recoverability (hardware-capable; SE12 binds the product RPO/RTO) | T1→T2 snapshot interval ≤ 1 h and full replication ≤ 24 h; single-VM restore from T2 ≤ 4 h; T3 copy interval ≤ 24 h for class D-IRR; restore of any D-IRR dataset from T3 verified at every stage gate | SE11-AC-07 |
+| SE11-NFR-06 | Availability (single-host) | No HA claim. Planned hardware maintenance only in declared windows; FD-HOST recovery to degraded service (hosted fallback or replacement host of the §11.4 class) ≤ 1 working day from T2/T3, assumption ASM-SE11-07 | SE11-AC-07, SE19 resilience tests |
+| SE11-NFR-07 | Integrity after abrupt loss | After an abrupt power loss (FD-UPS-A drill), every VM filesystem, the host filesystem and the NAS array pass integrity checks with zero unrecoverable errors; database loss ≤ last committed transaction (SE12 verifies) | SE11-AC-13 |
+| SE11-NFR-08 | Thermal/power envelope | ≥ 24 h combined stress with CPU package ≤ 230 W, all device temperatures within manufacturer limits, zero memory errors at the chosen DDR5 profile | SE11-AC-04 |
+
+## 4. Workload-to-hardware allocation (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03)
+
+Allocation maps workload classes to **resource pools**, never to named devices; a pool is addressed by a logical name (§160: no hard-coded host names, local paths or addresses). Pools are the unit that moves between local, hosted and customer infrastructure (§168). Every pool has either its own budget or an explicit *shared-budget membership* with a stated share (SE11-REQ-01, corrected per finding 004). Units: **LP** = logical processor of the host (32 LP = 16 physical cores × 2 SMT threads, B1); **vCPU** = virtual processor assigned to a guest (1 vCPU is scheduled onto 1 LP at a time).
+
+| Pool | Workload class (seed §167, §169–§171, §174) | Priority (§174) | Placement in the reference configuration | CPU budget | Memory budget (candidate envelope, §5.3) | Storage device (§6.1) |
+|---|---|---|---|---|---|---|
+| `pool.core` | Platform core: orchestration, APIs, queues, registry/control | Highest | Linux VM "Core" | 4 vCPU; Hyper-V reserve 100 % (= 4 LP guaranteed); limit 100 %; weight 200 | Static (Dynamic Memory off): M-B envelope 32 GB / M-A envelope 24 GB | M2_4 |
+| `pool.data` | Databases, search/knowledge data, caches | Highest | Linux VM "Data" | 4 vCPU; reserve 100 % (4 LP); weight 200 | Static: M-B 64 GB / M-A 32 GB | M2_4 |
+| `pool.runtime` | Stable runtime of accepted stage baselines (§156, §235) | Highest | **Shared-budget member of `pool.core` and `pool.data`**: runtime namespaces inside the Core and Data VMs with separate projects, credentials, networks, data paths (§156). Share: within each VM, runtime namespaces hold cgroup `cpu.weight` ≥ 3 × the platform-control namespaces and `memory.min` ≥ 50 % of the VM's static memory (defaults; EL binds the exact values) | inherits | inherits | M2_4 |
+| `pool.validate` | Integration, security validation, staging, release challenger, VP validation | High | Linux VM "Validation/Staging" | 8 vCPU; reserve 50 % (4 LP guaranteed); limit 100 %; weight 150 | Dynamic: min 16 / max 48 GB (M-B); min 12 / max 24 GB (M-A) | M2_2 |
+| `pool.build` | CI runners, build cache, artifact generation | Medium | Linux VM "Build/CI" | 16 vCPU; reserve 25 % (4 LP guaranteed); limit 100 %; weight 100 | Dynamic: min 16 / max 64 GB (M-B); min 12 / max 32 GB (M-A) | M2_2 (VM disk, artifacts) + M2_3 (scratch) |
+| `pool.agents` | API-based model workers | Medium | Hosted/cloud executors first. When local: **member of `pool.build` budget** as containers in the Build VM with cgroup `cpu.max` ≤ 50 % and `memory.max` ≤ 40 % of the VM | member | member | M2_2 |
+| `pool.test` | Test/browser/scanning workers, synthetic users | Medium / lowest | As `pool.agents`: **member of `pool.build` budget**, `cpu.max` ≤ 50 %, `memory.max` ≤ 40 %; agents + tests together never exceed the Build VM's own ceiling | member | member | M2_2 |
+| `pool.background` | Background analysis, documentation, low-priority optimisation | Lowest | **Member of `pool.build` budget**: cgroup `cpu.weight` 10 (vs 100 for build jobs), `cpu.max` ≤ 25 %, no memory guarantee; first to be shed (§175) | member | member | M2_2 |
+| `pool.gpu` | Local inference, embeddings, vision, evaluation (§176) | Medium | DEFERRED — PCI_E1 when adopted (§5.5); external providers meanwhile (§160) | — | — | — |
+| `pool.durable` | Backups, snapshots, release evidence, archives, mirrors (§164) | n/a | NAS T2 (+ T3 isolated copy, §6.3) | — | — | NAS |
+| `pool.admin` | Host OS, Hyper-V root, WSL2 + Docker Desktop interactive use (§167) | n/a | Windows host root partition | Not reservable in Hyper-V; the root partition takes the floating LPs (§5.2); operational rule: VM reserves sum ≤ 16 LP so ≥ 16 LP float | Host OS reserve 16 GB + WSL2 cap 8 GB (`.wslconfig`) | M2_1 |
+
+**Simultaneous accounting at baseline (corrects v1's mixed units):** vCPUs assigned to VMs = 4 + 4 + 8 + 16 = **32 vCPU on 32 LP** (1 : 1, no vCPU oversubscription at baseline; bursts happen *within* a VM's own vCPU count, not by adding vCPUs). Guaranteed LPs (sum of reserves) = 4 + 4 + 4 + 4 = **16 LP (50 %)**. Floating LPs = **16**, claimed first by the host root partition (typical need 2–4 LP, ASM-SE11-03) and then by VMs in weight order 200 : 200 : 150 : 100, which yields the deterministic throttling order background → build → validation → (never) core/data under saturation. Memory accounting is in §5.3 per candidate.
+
+Rule SE11-REQ-01 (restated): `pool.core`, `pool.data` and `pool.runtime` reservations are hard — static memory, 100 % processor reserve, never oversubscribed; every other pool has a declared guaranteed floor and ceiling or an explicit membership share as above. Rule SE11-REQ-14: the reservation mechanism is the hypervisor's per-VM processor reserve/limit/weight and static-versus-dynamic memory controls plus in-VM cgroup shares for members; no pool relies on "best effort".
