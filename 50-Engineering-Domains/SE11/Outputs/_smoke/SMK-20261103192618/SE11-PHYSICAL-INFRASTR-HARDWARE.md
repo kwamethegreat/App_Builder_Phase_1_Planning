@@ -94,7 +94,7 @@ SEED-01 §177 (section 46) imposes infrastructure acceptance outcomes that this 
 | Network switching / NICs | One managed switch with ≥2×10GBase-T (B18); central 10GbE NIC (B10) plus onboard 5 GbE; NAS 2×10GbE + 2×5GbE; internet edge as a specification class | SE11 physical; SE14 logical network |
 | Rack / placement | Desk/room placement of central node and NAS at Stage 1; 18U rack deferred (B17) | SE11 (`SE11-POWER-COOLING-RACK`) |
 | UPS / power distribution | Two power domains: PD-A (central node + NAS + switch + internet edge) on UPS-A (B15); PD-B (rack) on UPS-B (B16, deferred) | SE11 |
-| Cabling | Cat6a for all 10GBase-T links; direct backup link PC↔NAS (SE11-ADR-07); labelled per §9.1 | SE11 |
+| Cabling | Cat6a for all 10GBase-T links; switch-independent recovery re-patch path PC↔NAS (SE11-ADR-07); labelled per §9.1 | SE11 |
 | Out-of-band / management | No BMC on the consumer-class board; management via Windows host, NAS web console, switch console on an isolated management VLAN; optional IP-KVM class device as expansion | SE11 physical; SE20 operations |
 
 ### 2.2 Out of scope (referenced, not included)
@@ -121,7 +121,7 @@ flowchart LR
   PC -- "10GBase-T (NIC B10)" --- SW
   PC -- "5GbE onboard: MGMT" --- SW
   NAS -- "10GbE port 1" --- SW
-  PC -. "direct 5GbE/10GbE backup link<br/>(SE11-ADR-07)" .- NAS
+  PC -. "recovery re-patch path to NAS port 2<br/>(SE11-ADR-07, switch outage only)" .- NAS
   RACK -. "future 10GbE uplink" .- SW
   UPSA["UPS-A USB-HID"] --> NAS
 ```
@@ -196,11 +196,11 @@ The central node CPU is the 16-core / 32-thread Zen 5 part with 170 W TDP, ~230 
 | M2_3 | Gen4 x2, chipset | Build cache / scratch (B05 #2) | Shares with PCI_E3 (above); x2 caps scratch at Gen4 x2 bandwidth — acceptable for scratch |
 | M2_4 | Gen4 x4, chipset | Platform data / DBs / containers (B06 #1) | Chipset uplink contention with PCI_E3 and M2_3 |
 | 4× SATA | chipset | Spare (§12) | — |
-| 5 GbE LAN onboard | chipset | Management path (POOL-M) on MGMT VLAN; backup data path per SE11-ADR-07 | — |
+| 5 GbE LAN onboard | chipset | Management path (POOL-M) on MGMT VLAN | — |
 | Wi-Fi 7 / Bluetooth 5.4 | — | **Disabled in firmware** (SE11-REQ-14, §11) | — |
 | 2× USB4, USB 10/20 Gbps, USB 2.0 | — | Console peripherals and UPS-HID only; policy per §11 | USB4 may be lost to M2_2 sharing |
 
-**SE11-DEC-03 (NIC/scratch fallback).** If SE11-GATE-02 shows PCI_E3 and M2_3 are mutually exclusive, the scratch NVMe moves to a chipset SATA/alternative M.2 arrangement is *not* chosen; instead the 1 TB scratch device is omitted, scratch is carved from M2_2 (4 TB VM/artifact store) as a separate virtual disk, and PCI_E3 keeps the NIC. Reason: 10GbE to the durable tier is architecturally mandatory (§6), scratch capacity is not. Impact: VM/artifact store usable capacity falls by the scratch allocation (planning range 300–600 GB, ASM-SE11-01); recorded as SUBSTITUTE in the next revision if executed.
+**SE11-DEC-03 (NIC/scratch fallback).** If SE11-GATE-02 shows PCI_E3 and M2_3 are mutually exclusive, the 1 TB scratch device is omitted, scratch is carved from M2_2 (4 TB VM/artifact store) as a separate virtual disk, and PCI_E3 keeps the NIC. Reason: 10GbE to the durable tier is architecturally mandatory (§6), scratch capacity is not. Impact: VM/artifact store usable capacity falls by the scratch allocation (planning range 300–600 GB, ASM-SE11-01); recorded as SUBSTITUTE in the next revision if executed.
 
 ### 4.3 Memory (B04)
 
@@ -263,7 +263,7 @@ Assumptions and constraints:
   - **SE11-REQ-08** RAID 6 is drive-failure resilience only (SEED-01 §164). Operating requirements: monthly scrub; SMART monitoring; a cold spare of the same specification class (20 TB-class enterprise CMR SATA) held on site so a rebuild starts within the maintenance-window class of §9.4; rebuild of a 20 TB member is expected to take days (ASM-SE11-03) during which the array tolerates one further failure — this window is SE11-RISK-04.
   - **SE11-GATE-05** verifies the mixed 16 GB + 32 GB module configuration is supported by the NAS vendor's compatibility list and that ECC is active; if not supported, the fallback is 2×32 GB-class matched ECC SO-DIMMs (specification class), recorded as a substitution.
   - The 4×M.2 NVMe slots on the NAS are spare at baseline (§12); they are **not** used as write cache until SE12 shows a measured benefit, because a cache tier adds a failure mode to the durable copy.
-  - Both 10GbE ports are usable: port 1 to the switch (B18); port 2 reserved for the direct backup link or a second host (SE11-ADR-07, §12).
+  - Both 10GbE ports are usable: port 1 to the switch (B18); port 2 reserved for the recovery re-patch path (SE11-ADR-07) or a second host (§12).
 
 ### 5.3 Isolated-copy tier (POOL-S-ISO) — specification class
 
@@ -296,15 +296,15 @@ Recovery expectations: a failed NVMe device is replaced and its VM disks restore
 
 | Link | Endpoints | Speed | Purpose | Constraint |
 |---|---|---|---|---|
-| L1 | PC NIC B10 (PCI_E3) ↔ switch 10G port | 10GBase-T | PLATFORM + STORAGE VLANs (tagged) | PCI_E3 lane sharing (SE11-GATE-02); PCIe 3.0 x4 card delivers full 10GbE even at x2 Gen3 negotiation (10GbE needs ~1.25 GB/s; Gen3 x2 ≈ 1.97 GB/s) — SE11-DEC-03 is the fallback only if the slot is disabled entirely |
-| L2 | PC onboard 5 GbE ↔ switch | 5GbE / 2.5GbE | MGMT VLAN (POOL-M), host-level access, UPS client traffic | Must stay up when Hyper-V virtual switch on L1 is reconfigured |
+| L1 | PC NIC B10 (PCI_E3) ↔ switch 10G port | 10GBase-T | PLATFORM + STORAGE VLANs (tagged) | PCI_E3 lane sharing (SE11-GATE-02); the PCIe 3.0 x4 card still delivers full 10GbE if the slot negotiates x2 (10GbE needs ~1.25 GB/s; Gen3 x2 ≈ 1.97 GB/s) — SE11-DEC-03 is the fallback only if the slot is disabled entirely |
+| L2 | PC onboard 5 GbE ↔ switch | 5GbE / 2.5GbE | MGMT VLAN (POOL-M), host-level access, UPS client traffic | Must stay up when the Hyper-V virtual switch on L1 is reconfigured |
 | L3 | NAS 10GbE port 1 ↔ switch 10G port | 10GBase-T | STORAGE VLAN: backups, artifacts, VM archives | — |
 | L4 | NAS 5GbE port ↔ switch | 5GbE | MGMT VLAN: NAS console, UPS network server | — |
-| L5 (SE11-ADR-07) | PC onboard 5 GbE *or* NAS 10GbE port 2 direct to PC — see ADR | direct | Switch-independent backup/replication path | Only one of L2/L5 can use the PC's single onboard port; ADR resolves |
+| L5 (SE11-ADR-07) | PC NIC B10 ↔ NAS 10GbE port 2, re-patched only during a switch outage | 10GBase-T | Switch-independent recovery path | Not a permanently cabled link at baseline; see ADR-07 |
 | L6 | Internet edge ↔ switch | per ISP | External AI providers, hosted executors, repositories | Single uplink = failure domain FD-EXT (§8) |
 | L7 (deferred) | Rack worker uplink ↔ switch | 1/2.5/10GbE | POOL-W-* local nodes | Deferred with B17 |
 
-**SE11-ADR-07 — direct backup link.** Decision: at baseline L5 is implemented as NAS 10GbE port 2 ↔ PC NIC? No — the PC has one 10GbE port, already used for L1. Resolution: L5 is *not* a separate physical link at baseline; the switch-independent recovery path is instead the documented procedure "re-patch L1 directly to NAS port 2 with a crossover-capable 10GBase-T link" during a switch outage (10GBase-T auto-MDI-X; ASM-SE11-05 that both NICs support direct attach, verified at SE11-GATE-08). Alternatives: (1) a second 10GbE NIC in PCI_E2 — rejected: PCI_E2 is x1 Gen3 (≈1 GB/s), insufficient and the only spare slot; (2) permanently dedicating the PC 5 GbE port to a direct NAS link — rejected: it removes the management path L2. Impact: switch failure (FD-SW, §8) has a manual, minutes-scale workaround rather than automatic failover; acceptable at MVP under SEED-01 §175 graceful degradation.
+**SE11-ADR-07 — switch-independent recovery path.** Decision: no permanently cabled direct PC↔NAS link exists at baseline, because the central node has a single 10GbE port (used by L1) and its single onboard 5 GbE port is the management path (L2). The switch-independent path is instead a documented procedure: during a switch outage, the L1 cable is re-patched from the switch to NAS 10GbE port 2 (10GBase-T auto-MDI-X direct attach; ASM-SE11-05 that both NICs support direct attach, verified at SE11-GATE-08), restoring backup/restore traffic between the hot and durable tiers. Alternatives: (1) a second 10GbE NIC in PCI_E2 — rejected: PCI_E2 is Gen3 x1 (≈1 GB/s), below 10GbE line rate, and it is the only spare slot; (2) permanently dedicating the PC 5 GbE port to a direct NAS link — rejected: it removes the management path L2. Impact: switch failure (FD-SW, §8) has a manual, minutes-scale workaround rather than automatic failover; acceptable at MVP under SEED-01 §175 graceful degradation.
 
 ### 6.3 East-west traffic and bottleneck avoidance
 
@@ -358,7 +358,7 @@ Every consumer of hardware facts references the failure-domain ids below (ENV-DE
 | FD-NVME-x | One NVMe device | Data on that device only | SMART, OS errors | Affected VM(s) stop | Replace device; restore from POOL-S-DUR | Per-device, bounded by RPO |
 | FD-NAS | NAS chassis/OS/controller | POOL-S-DUR, UPS master role, backup target | NAS monitoring; UPS client loses server | Platform runtime continues on hot tier; backups queue; UPS signalling degraded → host falls back to local UPS-HID if cable re-patched (manual) | Move drive set to same-family chassis; or restore from POOL-S-ISO | Yes for durable tier → mitigated by POOL-S-ISO (SE11-REQ-09) |
 | FD-RAID | Drive failures within RAID 6 | None until >2 concurrent failures | SMART, array status | Degraded array; rebuild window (SE11-RISK-04) | Replace with cold spare | No, within tolerance |
-| FD-SW | Switch | L1–L4, L6; MGMT VLAN | Link-down on host and NAS | Runtime continues (in-host traffic unaffected); NAS backups, hosted executors and external AI lost; management via console only | Direct-attach L1→NAS port 2 (ADR-07); replace switch | Yes — manual workaround (SE11-RISK-09) |
+| FD-SW | Switch | L1–L4, L6; MGMT VLAN | Link-down on host and NAS | Runtime continues (in-host traffic unaffected); NAS backups, hosted executors and external AI lost; management via console only | Re-patch L1 to NAS port 2 (ADR-07); replace switch | Yes — manual workaround (SE11-RISK-09) |
 | FD-UPS-A | UPS-A failure or battery exhaustion | Whole PD-A | UPS telemetry | Ordered shutdown if signalled; hard stop if UPS fails outright | Replace UPS; restart; verify file-system/DB consistency | Yes — accepted; mitigated by replaceable batteries and SE11-GATE-06 |
 | FD-CIRC-A | Branch circuit A | PD-A (through UPS-A battery) | UPS on-battery event | Ordered shutdown before battery exhaustion | Electrician; restart | Yes — same as FD-UPS-A |
 | FD-UPS-B / FD-CIRC-B | Rack power (deferred) | POOL-W-* local nodes only | — | Capacity reduction only (SEED-01 §172) | — | Not at baseline |
