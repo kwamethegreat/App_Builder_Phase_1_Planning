@@ -1,0 +1,189 @@
+---
+id: SE11-PHYSICAL-INFRASTR-HARDWARE
+version: 6
+status: complete
+owner: REVIEWER_EN
+based_on: [SE11-PHYSICAL-INFRASTR-HARDWARE, SEED-01]
+requirements: [ENV-DEC-017, SE11-REQ-17, SE11-REQ-18, SE11-REQ-20, SE11-REQ-22, SE11-DEC-18, SE11-DEC-22, SE11-NFR-03]
+---
+run_id: 'SMK-20261103114255:SE11-PHYSICAL-INFRASTR-HARDWARE:review:5'
+round_id: SMK-20261103114255
+task_id: SE11-PHYSICAL-INFRASTR-HARDWARE
+reviewed_version: 5
+verdict: revise
+review_basis:
+  target: Full version 5 supplied in context.
+  source_checks: 'SEED-01 sections §0 and §227 read independently; sha 2d3a171d6961a8790f5a9812eeb1e3907f188242.'
+  limitations: 'The required register and upstream dependencies are marked missing in context. Their consistency cannot be verified. Prior-finding continuity uses the finding ids and correction descriptions in target sections 0.3–0.4; no separate prior review was supplied.'
+summary: >-
+  The document is not an implementation-ready hardware baseline. Required-source
+  reconciliation and current compatibility evidence remain unmet, notwithstanding
+  the redefinition of covered. The revised restart, bootstrap and protection
+  contracts still contain executable contradictions and fail-open paths.
+findings:
+  - id: REVIEWER-EN-SE11-PHYSICAL-001
+    severity: major
+    type: source_gap
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01
+    source_or_requirement_id: PL-REQ-ID-REGISTER
+    description: >-
+      Sections 0.3, 0.5 and 19 claim required-source coverage by treating seed-level
+      reconciliation as the register's content and the absent register as merely
+      missing identifiers. The required source has not been consumed, and there
+      is no evidence that its resolved requirements, decisions and constraints
+      equal the author's seed interpretation. All required product and EL
+      dependencies also remain unreconciled. ASM-SE11-01 cannot establish that
+      equivalence. Finding 001 remains open; the PROVISIONAL label and a future
+      AC-11 do not supply the missing authoritative baseline.
+    required_correction: >-
+      Reconcile the dispositions, NFRs, security-control bindings and ADRs against
+      the actual required register and upstream architecture, citing their ids
+      and resolving documented conflicts. Remove the assertions that only id
+      binding is missing and that an unread source is covered. If these inputs
+      remain absent from the authorized corpus, preserve an explicit unmet-source
+      disposition and do not represent the baseline as satisfying this review gate.
+  - id: REVIEWER-EN-SE11-PHYSICAL-003
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05
+    source_or_requirement_id: SE11-REQ-18
+    description: >-
+      The new producer contract identifies protection inputs, but the enforcement
+      guarantee remains false under publisher loss. Part B explicitly leaves
+      mutate unchanged on UNKNOWN and specifies only admit=DENY on STALE. A store
+      last told mutate=ALLOW can therefore continue writing indefinitely after
+      losing the publisher, including beyond A_max+G with no T3-SUB copy. This
+      violates section 6.3's required FREEZE and bounded-exposure claims. Producer
+      registration neither enforces that deadline nor makes the store's behaviour
+      independent of SE11's guarantee, contrary to section 18.3 CI-2.
+    required_correction: >-
+      Specify a bounded mutation authorization: either FREEZE on stale/unknown
+      protection state or a consumer-enforced expiry derived from the last verified
+      copy and its permitted budget. Define startup, clock uncertainty, restart
+      and recovery behaviour for this authorization. Make enforcement and its
+      conformance evidence explicit obligations of each registered store, and
+      condition the end-to-end guarantee on that evidence. Add a publisher-outage
+      test spanning the expiry deadline while an independently running store
+      attempts mutations, including SE11's bootstrap store.
+  - id: REVIEWER-EN-SE11-PHYSICAL-006
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07
+    source_or_requirement_id: SE11-NFR-03
+    description: >-
+      Rejecting S-2/M3 does not make the admitted S-2/M1 restart implementable.
+      Section 8.3 S5 requires the host to read mains and charge through its own
+      direct UPS link before S6, but S-2 connects that link exclusively to the NAS.
+      There is no candidate-specific replacement for this S5 prerequisite or
+      timeout when the NAS UPS service fails to return. The S-2 timing table also
+      uses the direct-host T_boot+T_decide budget without deriving the NAS-mediated
+      status dependency. For S-3/N1, UPS-N may be on another circuit, yet host
+      readiness on UPS-A alone authorizes waking the NAS without establishing
+      UPS-N's online/charge/runtime condition. Thus the matrix admits combinations
+      whose restart eligibility is undefined for their actual power domains.
+    required_correction: >-
+      Define S5 eligibility and status ownership separately for each admitted
+      topology. For S-2/M1, specify the post-AC-cycle NAS-server readiness/status
+      path, bounded wait and fail-safe outcome, or remove S-2 from admissibility.
+      For S-3, establish NAS restart eligibility for UPS-N independently of UPS-A,
+      including the different-circuit case. Recompute end-to-end timing using
+      these dependencies and add drills with the NAS UPS service unavailable and
+      with UPS-A restored while UPS-N remains on battery.
+  - id: REVIEWER-EN-SE11-PHYSICAL-008
+    severity: major
+    type: outline_gap
+    outline_id: QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03
+    source_or_requirement_id: ENV-DEC-017
+    description: >-
+      Sections 11.2–11.3 and 17 explicitly contain zero G1 evidence rows, no
+      confirmed configuration and no current manufacturer support or practical
+      availability check. SEL-0 is the same proposed reference BOM, not evidence
+      that its combinations are currently supported. Its attribution field gives
+      a revision label and hash, not a dated current verification. Section 19
+      nevertheless reports the criterion covered by redefining covered to include
+      OPEN/UNMET. A gate preventing construction does not satisfy the required
+      compatibility assessment. Finding 008 remains open. Additionally FC-02 still
+      offers an AC-04 commissioning stability pass as an alternative to documentary
+      qualification although G1 expressly cannot depend on G3.
+    required_correction: >-
+      Record attributable, dated documentary evidence establishing at least one
+      coherent currently supported and practically available configuration, with
+      the applicable feasibility conditions closed or technically dispositioned.
+      Make FC-02 consistent with the document-only G1 gate; commissioning cannot
+      be its prerequisite. Until the required evidence exists in the authorized
+      corpus, keep QC-AR-03 unmet rather than covered and do not claim that SEL-0
+      closes the prior finding.
+  - id: REVIEWER-EN-SE11-PHYSICAL-009
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-14
+    source_or_requirement_id: SE11-DEC-18
+    description: >-
+      Moving commissioning records to REPO-EXT removes the original local-repository
+      bootstrap, but the new KEYS trace is circular. AC-07d step 2 must register
+      an authenticated Part C producer and submit fixture/custody evidence before
+      KEYS becomes ARMED. Part C requires a per-producer bearer token classified as
+      a real KEYS secret; those tokens are generated only in step 4. Step 3 must
+      also read the authenticated Part B admission level before creating the first
+      secret, while its read token is likewise generated in step 4. Step 0 forbids
+      existing generated secrets. No separate authenticated local bootstrap path
+      is specified. The trace cannot reach its first legal real-secret creation
+      under its own contracts.
+    required_correction: >-
+      Define a secure, non-circular initial authority and evidence path for the
+      SE11 bootstrap store, including how it authenticates before bearer tokens
+      exist, how initial custody/fixture evidence is committed, and how it obtains
+      the first admission decision. Explicitly transition to the normal token
+      contracts and revoke any bootstrap authority. Re-execute the empty-platform
+      trace with every credential creation and use ordered, preserving the stated
+      data-protection invariants and rejecting unauthorized bootstrap attempts.
+  - id: REVIEWER-EN-SE11-PHYSICAL-010
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-09
+    source_or_requirement_id: SE11-DEC-22
+    description: >-
+      Part B's globally monotonic sequence guarantee is not established by
+      unix_seconds*10^6 after counter loss. A publisher can issue N*10^6+1, lose its
+      counter and restart within second N at N*10^6, reusing or decreasing sequence
+      values despite issuing far fewer than one million events per second. Clock
+      rollback after a host rebuild produces the same failure over a longer
+      interval. The contract supplies no trusted-time or external high-water-mark
+      mechanism that excludes these cases. Consumers can skip reused events, and
+      a valid old cursor can be misclassified as corrupt. The added heartbeat and
+      snapshot rules do not repair the monotonicity claim in finding 010.
+    required_correction: >-
+      Use a sequence identity recoverable after the defined storage-loss failure,
+      or an incarnation-aware cursor with an explicit reset/snapshot handshake.
+      Specify clock rollback, same-second publisher restarts, counter loss and
+      consumer recovery without assuming that a wall-clock floor exceeds prior
+      emissions. If epochs are used, the API must accept and compare them rather
+      than treating them as diagnostics. Extend AC-09 with same-second counter
+      loss and a clock earlier than the last issued event, verifying no silent
+      skipping or identifier reuse.
+  - id: REVIEWER-EN-SE11-PHYSICAL-011
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05
+    source_or_requirement_id: SE11-REQ-17
+    description: >-
+      The revised protection intake and state machine disagree on recovery
+      validity. Section 6.3 makes a failed last restore verification immediately
+      EXPIRED, but Part C only logs RESTORE_FAIL and lets ageing continue; AC-07b-rec
+      supplies another failure path that merely stops timestamp advancement.
+      EXPIRED also permits mutation on COPY_OK target=T3SUB alone, although normal
+      COPY protection requires a matched RESTORE_OK. The intake has no explicit
+      fixture=false guard on the RESTORE_OK transition that updates t3_last_ok,
+      despite recurring fixture restores being forbidden from protecting real
+      data. These rules allow materially different admission and mutation
+      behaviour from the same evidence, and can allow writes using an unverified
+      substitute copy.
+    required_correction: >-
+      Publish one authoritative transition table distinguishing mechanism fixtures,
+      real copies, restore failures and substitute copies. Define failure precedence,
+      require successful matched real-copy restore evidence before a substitute
+      authorizes mutation, and prohibit fixture records from advancing real-data
+      protection timestamps. Specify duplicate/out-of-order evidence handling and
+      recovery from a failed restore. Align sections 6.3, 14 and 18.2, and test a
+      failed real restore, COPY_OK without RESTORE_OK, and a successful recurring
+      fixture while real-data protection remains expired.
