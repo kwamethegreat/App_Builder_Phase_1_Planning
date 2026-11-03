@@ -1,0 +1,91 @@
+---
+id: SE11-PHYSICAL-INFRASTR-HARDWARE
+version: 5
+status: complete
+owner: REVIEWER_EN
+based_on: [SE11-PHYSICAL-INFRASTR-HARDWARE, SEED-01]
+requirements: [ENV-DEC-017, SE11-REQ-12, SE11-REQ-16, SE11-GATE-06, SE11-AC-05]
+---
+run_id: SMK-20261103192618:SE11-PHYSICAL-INFRASTR-HARDWARE:review:4
+task_id: SE11-PHYSICAL-INFRASTR-HARDWARE
+reviewed_version: 4
+verdict: revise
+review_scope: >-
+  Independent re-review of the supplied version 4, including its revision history,
+  criteria coverage, internal buildability and shutdown/power corrections.
+  Missing upstream documents, contract registration and external manufacturer
+  verification are exempt under the smoke-run instructions.
+source_checks:
+  - source: SEED-01
+    version: Proposed Revision 1.1
+    sha: 2d3a171d6961a8790f5a9812eeb1e3907f188242
+    sections_read: ['§162', '§229']
+    result: >-
+      Evidence-driven memory selection and the baseline UPS ratings agree with
+      these seed sections. External compatibility remains an explicitly open
+      acceptance gate, not verified evidence.
+criteria_assessment:
+  outline: >-
+    All fourteen outline topics have explicit sections. BOM dispositions,
+    workload pools, interfaces, failure domains, operations, security,
+    substitution rules and acceptance owners are recorded. The safe-shutdown
+    mechanism still fails its stated bounds for signal recovery during an outage.
+  quality: >-
+    Source/version identification, disposition traceability, expansion boundaries,
+    substitution constraints and exact-baseline sign-off are present. Coherence
+    and validation coverage are deficient for the transition described in finding 02.
+  boundaries: >-
+    No procurement workflow, prices or acquisition dates are introduced.
+    Missing upstream content and unverified external facts are not findings.
+re_review:
+  REVIEWER_EN-SE11-PHYSICAL-01: >-
+    Closed: initial memory capacity is selected through GATE-10 rather than
+    committing the maximum from unmeasured planning ranges.
+  REVIEWER_EN-SE11-PHYSICAL-02: >-
+    Remains major: acknowledgement-independent NAS deadlines, irreversible
+    initiation and preservation of an already-armed ON-BATTERY deadline correct
+    the previously illustrated paths. Recovery from STALE before the first
+    ON-BATTERY observation still invalidates the claimed bounds and ordering.
+  REVIEWER_EN-SE11-PHYSICAL-03: >-
+    Closed: DC estimates do not double count CPU load; PSU and UPS admission
+    limits now follow installed ratings, and substitutions require renewed
+    measurements and independent loading/runtime checks.
+  REVIEWER_EN-SE11-PHYSICAL-04: >-
+    Closed: management NIC capability is distinguished from negotiated speed,
+    and minimum/preferred switch port budgets reconcile.
+findings:
+  - id: REVIEWER_EN-SE11-PHYSICAL-02
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07
+    source_or_requirement_id: SE11-REQ-16
+    description: >-
+      Section 7.5 does not define a safe STALE-to-ON-BATTERY recovery transition.
+      Its t_obs <= D bound holds only while communication is intact, but the
+      derivation applies it to every ON-BATTERY path. With the worked values,
+      let the last ONLINE update and utility loss occur at t=0, lose the switch,
+      and restore communication with the first ON-BATTERY update at t=149 s.
+      Rule 4 no longer requires shutdown at 150 s because a valid update arrived;
+      rule 2 instead arms A=179 s. Host completion may be 299 s, while the NAS
+      initiates at 200-210 s. The restored data path can therefore be used for a
+      flush while the NAS shuts down; the blind-path exception's premise that
+      no data path exists is no longer true. The runtime proof also fails for
+      configurations allowed by I1-I3: changing only T_stale_max to 180 s and
+      restoring the signal at 179 s permits A=209 s and host completion at 329 s,
+      exceeding R_measured/2=300 s although all three admission inequalities pass.
+      Drills (a)-(f) do not test recovery before initiation from a blind outage.
+    required_correction: >-
+      Specify recovery transitions before initiation for STALE entered from both
+      ONLINE and ON-BATTERY. Preserve a latched blind-path safety deadline across
+      a recovered ON-BATTERY update instead of replacing it through t_L or a fresh
+      ride-through interval; define explicitly when a valid ONLINE observation
+      may clear it. Restrict D=2P to intact communication and derive bounds for
+      delayed first observations. Ensure NAS ordering covers recovered paths that
+      can flush, either by deriving its deadline from the actual worst-case host
+      completion bound or by explicitly preventing NAS-dependent flushes in those
+      paths and recording that degraded recovery behaviour. Recompute runtime
+      inequalities and the worked timeline accordingly. Extend GATE-06 and AC-05
+      with recovery just before the blind deadline, subsequent signal loss, and
+      assertions for host completion and NAS/data-path ordering. Align the ADR,
+      risk and inventory references with the corrected policy.
+unresolved_issues: []
