@@ -1,0 +1,297 @@
+---
+id: SE11-PHYSICAL-INFRASTR-HARDWARE
+version: 2
+status: complete
+owner: REVIEWER_EN
+based_on: [SE11-PHYSICAL-INFRASTR-HARDWARE, SEED-01]
+requirements: [ENV-DEC-017, SE11-DEC-04, SE11-DEC-05, SE11-DEC-10a, SE11-DEC-11, SE11-DEC-14, SE11-DEC-15, SE11-ADR-01, SE11-ADR-02, SE11-REQ-05, SE11-REQ-06, SE11-REQ-11, SE11-NFR-01, SE11-NFR-04, SE11-NFR-05, ASM-SE11-01, ASM-SE11-04, ASM-SE11-06]
+---
+run_id: SMK-20261103105206:SE11-PHYSICAL-INFRASTR-HARDWARE:review:1
+task_id: SE11-PHYSICAL-INFRASTR-HARDWARE
+reviewed_version: 1
+reviewed_path: 50-Engineering-Domains/SE11/Outputs/_smoke/SMK-20261103105206/SE11-PHYSICAL-INFRASTR-HARDWARE.md
+verdict: revise
+review_scope:
+  document_class: physical_hardware_architecture
+  target_source: full target supplied in run context
+  seed_verified:
+    id: SEED-01
+    version: Proposed Revision 1.1
+    sha: 2d3a171d6961a8790f5a9812eeb1e3907f188242
+    sections_read: ['§160', '§227', '§238']
+  dependency_limit: >-
+    The run context marks the required Stage-0 register and all required PM09,
+    NT16, EL and SP16 dependencies missing. EL consistency and upstream NFR/control
+    alignment cannot be verified. Their absence is not evidence of compliance.
+  plan_guidelines: not_applicable_to_document_class
+summary: >-
+  The document identifies a versioned BOM, gives component dispositions, and exposes
+  major physical failure domains. It is not an implementable approved baseline.
+  Capacity selection is unsupported, portability is restricted contrary to the seed,
+  compatibility is declared before verification, and acceptance criteria conflict
+  with the selected hardware. Shutdown, recovery and cross-domain contracts remain
+  incomplete despite the signed baseline and covered quality checks.
+findings:
+  - id: REVIEWER-EN-SE11-PHYSICAL-01
+    type: source_gap
+    severity: major
+    location: '§1.1; §15; §16.3'
+    criteria: [OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01, QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07]
+    evidence: >-
+      The required PL-REQ-ID-REGISTER is classified as not applicable because it is
+      absent. Section 16.3 says no upstream dependency is listed for this task,
+      although the run context explicitly lists required PM09, NT16, EL and SP16
+      documents. The target also acknowledges that the selected vision revision
+      is proposed and that approval is unresolved, yet signs off the baseline.
+    impact: >-
+      Downstream consumers cannot establish that the hardware baseline satisfies
+      authoritative requirements or EL decisions. Automatic mapping of future
+      register rows without changing dispositions precludes genuine reconciliation.
+    required_change: >-
+      Correct the dependency inventory and distinguish missing from not applicable.
+      Record the exact authority decision supporting the source revision; do not
+      treat source availability as approval. Reconcile dispositions with the
+      authoritative register and required architecture dependencies when available.
+      Until that evidence exists, explicitly prohibit downstream implementation
+      freeze against this candidate and remove claims that upstream consistency
+      and authoritative sign-off have been established.
+
+  - id: REVIEWER-EN-SE11-PHYSICAL-02
+    type: unsupported_addition
+    severity: major
+    location: '§4.1 SE11-DEC-04; §4.3; §5.1 SE11-DEC-14; §13.2 SE11-ADR-02'
+    criteria: [OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04, OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05, QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04]
+    evidence: >-
+      The maximum 256 GB host configuration is adopted using assumed per-pool RAM
+      ranges without job concurrency, working-set measurements, dataset sizes or
+      workload-derived estimates. The listed consumers total 140–280 GB before
+      headroom, so the upper case does not fit 256 GB even before the required
+      15 percent reserve. ADR-02 says measured under-use will be recorded, not
+      reversed. The six 20 TB NAS drives have no retention/capacity calculation;
+      calling six drives the minimum with useful capacity does not define useful
+      capacity. SEED-01 §160 and §238 condition provisioning on workload evidence
+      and economics.
+    impact: >-
+      The design both overcommits its stated upper workload and locks in the largest
+      listed memory option without evidence. Storage provisioning is likewise not
+      justified by a usable-capacity requirement.
+    required_change: >-
+      Supply a reproducible demand model for memory, CPU concurrency and storage,
+      including reserves, retention and burst admission/shedding. Compare feasible
+      smaller/local/hosted configurations and retain the BOM as a reference until
+      sizing evidence selects a baseline. Remove the rule that sizing evidence
+      cannot reverse adoption. Make the selected configuration fit the admitted
+      simultaneous workload, not merely fall inside an aggregate range.
+
+  - id: REVIEWER-EN-SE11-PHYSICAL-03
+    type: dependency_inconsistency
+    severity: major
+    location: '§13.2 SE11-ADR-01 and SE11-ADR-08; §9.4'
+    criteria: [OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-13, QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05]
+    evidence: >-
+      ADR-01 rejects all-hosted capacity on the assertion that the seed requires
+      a local central node and local durable tier, and keeps that alternative
+      rejected unless SEED-01 changes. ADR-08 describes the consumer AM5 reference
+      configuration as fixed. Verified SEED-01 §160 explicitly allows different
+      greenfield hardware, hosted infrastructure or a hybrid; §238 expressly allows
+      managed/hosted equivalents for central compute, NAS, power and workers.
+    impact: >-
+      Reference devices are promoted into mandatory architecture constraints,
+      preventing permitted substitutions and portable deployment.
+    required_change: >-
+      Correct the ADR premises. Evaluate local and hosted alternatives against the
+      same isolation, performance, resilience, portability and governance outcomes.
+      Any decision to select local hardware must cite platform-specific evidence,
+      not an invented prohibition. Preserve the ability to revisit placement without
+      requiring a seed amendment.
+
+  - id: REVIEWER-EN-SE11-PHYSICAL-04
+    type: outline_gap
+    severity: major
+    location: '§4.2; §10.1–§10.2; §14 SE11-AC-01/02/09; §15 QC-AR-03'
+    criteria: [OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-10, QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03, BND-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04]
+    evidence: >-
+      The compatibility matrix is derived solely from nominal seed specifications.
+      Current manufacturer support, practical availability and memory/firmware
+      qualification are not checked, but QC-AR-03 is marked covered. The host OS
+      row says coexistence is validated although AC-09 is future work. GPU assignment
+      to a Linux VM and dedicated NVMe assignment are prescribed without identifying
+      a supported assignment mechanism for the selected Windows 11 Pro/Hyper-V,
+      board, firmware and driver combination. AC-02 checks enumeration and clearance,
+      not successful supported guest-device use.
+    impact: >-
+      Matching connectors and nominal capacities do not establish a buildable
+      hardware/OS/virtualization combination. Downstream implementation can freeze
+      unsupported capabilities or unavailable parts.
+    required_change: >-
+      Separate nominal fit, unverified support and evidenced compatibility. Cite
+      available manufacturer/support evidence with versions and applicability.
+      Specify and validate the supported device-assignment mode and guest behaviour,
+      including reset/reboot and recovery, before enabling those roles. Where the
+      corpus cannot establish support, retain an explicit candidate disposition and
+      a no-freeze/no-enable gate rather than claiming the check passed.
+
+  - id: REVIEWER-EN-SE11-PHYSICAL-05
+    type: downstream_unusable
+    severity: major
+    location: '§4.1 SE11-DEC-05/10a; §5.2; §14 SE11-AC-02/06; §16.4 SE11-NFR-01'
+    criteria: [OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05, OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-14, QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05]
+    evidence: >-
+      Section 5.2 limits M2_3 to approximately 50 percent of the drive rating because
+      it is x2, while AC-06 and NFR-01 require each drive to achieve at least 70 percent
+      of rated sequential performance. The alternative SATA scratch device is also
+      subject to a substitution rule preserving every NFR, without an alternative
+      performance criterion. AC-02 requires the original NIC and M2_3 combination to
+      enumerate even when the documented fallback removes scratch from M2_3.
+    impact: >-
+      Neither the intended x2 configuration nor the fallback has a consistent,
+      decidable acceptance path. An implementer must reinterpret requirements to pass.
+    required_change: >-
+      Define numeric slot- and role-specific read/write thresholds and benchmark
+      conditions, distinguishing device ratings from effective slot limits. Give
+      each disposition branch its own enumeration and performance checks. Show that
+      SATA scratch preserves workload outcomes or classify it as an architecture
+      change; update the NFR and acceptance references consistently.
+
+  - id: REVIEWER-EN-SE11-PHYSICAL-06
+    type: downstream_unusable
+    severity: major
+    location: '§7.1; §7.4; §8 FD-UPS-A/FD-MGMT; §14 SE11-AC-08'
+    criteria: [OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07, OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-08, OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-14]
+    evidence: >-
+      Shutdown depends on a host USB-HID event and an unspecified signal from the
+      Windows host to the NAS network-UPS client. No compatible server/client
+      protocol, implementation contract, acknowledgement, timeout or fallback is
+      defined. The host signals that shutdown is complete before powering off.
+      Behaviour when the host hangs, the USB link fails, a VM fails to drain or the
+      NAS control path is lost is absent. The start trigger is only low runtime,
+      with no relation to the measured sequence duration.
+    impact: >-
+      The host and NAS share a UPS and circuit, and the shutdown controller is inside
+      the failure domain it must protect. The stated ordering alone cannot ensure
+      the NAS outlives the final writes or shuts down safely when the host fails.
+    required_change: >-
+      Specify the supported UPS coordination interface and its owner, protected
+      communication path, trigger threshold, bounded step deadlines and fail-safe
+      NAS behaviour independent of host acknowledgement. Distinguish final-write
+      completion from host power-off. Extend AC-08 to cover hung participants,
+      lost signalling, low battery and restored mains, with bounded expected results.
+
+  - id: REVIEWER-EN-SE11-PHYSICAL-07
+    type: scope
+    severity: major
+    location: '§11; §15 Contract registration; §16.1; §16.4'
+    criteria: [OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-11, QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-06, QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07]
+    evidence: >-
+      Consumed interfaces are named only as SE12 storage/data design, SE14 network
+      design, SE17 controls and SE20 operations design, not owned versioned contract
+      IDs. RPO/RTO and control IDs remain promises for later revisions. The provided
+      hardware contract says registration in the owning interface document and EL
+      register is future work. SE11-REQ-11 is a request for control IDs, not security
+      control traceability.
+    impact: >-
+      The signed baseline cannot be composed with storage, security, reliability
+      or operations contracts. Local NFRs do not demonstrate alignment with EL NFRs,
+      and consumers cannot resolve required control or recovery guarantees.
+    required_change: >-
+      Identify each consumed contract by ID, owner and version and map hardware
+      NFRs and security capabilities to the governing NFR/control IDs. Record the
+      provided contract in the governed registration location and cite that record.
+      Treat absent contracts as unfulfilled dependencies with explicit consumption
+      gates, not as implemented interfaces or completed traceability.
+
+  - id: REVIEWER-EN-SE11-PHYSICAL-08
+    type: downstream_unusable
+    severity: major
+    location: '§5.1; §8 FD-NAS/FD-CIRCUIT-A; §14 acceptance gate; §16.2 ASM-SE11-04'
+    criteria: [OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05, OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-08, OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-14]
+    evidence: >-
+      ASM-SE11-04 requires an isolated/off-site copy before the first accepted stage
+      baseline, but no acceptance check establishes that copy or restores from it.
+      AC-10 restores from the NAS and AC-12 restores a NAS backup to another host;
+      neither proves survival of simultaneous host/NAS or site loss. Section 14's
+      baseline acceptance list does not include isolated-copy readiness.
+    impact: >-
+      A build can pass the stated gate while its only durable copies remain in the
+      same UPS, circuit and site failure domain, contrary to its own assumption.
+    required_change: >-
+      Make isolated-copy establishment and restore verification explicit acceptance
+      prerequisites, with an owned contract for protected data classes, independent
+      failure-domain placement, cadence, RPO/RTO and keys. Test recovery while both
+      central host and NAS are unavailable. If protection is deferred, define the
+      allowed data/use boundary and do not call that stage baseline accepted.
+
+  - id: REVIEWER-EN-SE11-PHYSICAL-09
+    type: downstream_unusable
+    severity: major
+    location: '§2.3; §6.1–§6.2; §12.3 TRG-SWITCH/TRG-10GBE-SATURATION; §16.2 ASM-SE11-01'
+    criteria: [OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-02, OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-06, OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-12]
+    evidence: >-
+      Stage-1 connectivity presumes an existing site gateway with at least 1 GbE
+      LAN ports, while the topology and tests describe gateway-side 5 GbE paths;
+      the fallback specification is only 2.5 GbE. The gateway's port count,
+      segmentation capability and readiness are not dispositioned. Management
+      and north-south traffic share that segment without a defined enforcement
+      boundary. TRG-SWITCH responds to host-link saturation by adding a switch even
+      though section 6.2 identifies the same single host link as the limiting path.
+    impact: >-
+      Greenfield build prerequisites and management isolation are unspecified, and
+      the capacity trigger can add hardware without removing its measured bottleneck.
+    required_change: >-
+      Define the gateway as an explicit greenfield dependency with an owner,
+      minimum ports/speeds, protected power, segmentation contract and readiness
+      evidence. Distinguish endpoint capability from negotiated link requirements.
+      Specify how management access is isolated at Stage 1. Route single-host-link
+      saturation directly to a capacity remedy or architecture review that changes
+      the limiting path; reserve switch addition for topology/endpoint expansion.
+
+  - id: REVIEWER-EN-SE11-PHYSICAL-10
+    type: downstream_unusable
+    severity: major
+    location: '§7.1–§7.3; §14 SE11-AC-05/08'
+    criteria: [OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07, QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-02]
+    evidence: >-
+      Section 7.2 labels the central-host estimate a sum, but its no-GPU components
+      total 240–350 W, not 340–380 W; adding 145 W yields 385–495 W, not 480–530 W.
+      No conversion/loss allowance explains the differences. PSU DC output and wall
+      AC draw are not separated. Gateway draw and NAS spin-up are omitted from the
+      PD-A total, although the gateway may be a protected load. PD-B's load budget
+      is simply its UPS rating rather than a load envelope with headroom.
+    impact: >-
+      PSU, UPS and shutdown-runtime sizing cannot use this as a consistent input.
+      Later measurements have no unambiguous design envelope or complete load list
+      against which to pass.
+    required_change: >-
+      Recalculate auditable component and domain totals, separating DC demand,
+      efficiency/loss assumptions and AC wall load. Include every protected load,
+      transient allowance and the distinct steady/peak headroom limits. Define a
+      bounded PD-B load envelope before its trigger is exercised. Tie power and
+      runtime tests to the same configurations and measurement boundaries.
+
+criteria_disposition:
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01: 'revise: finding 01; source identity present, authority incomplete'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-02: 'revise: finding 09; scope documented, gateway dependency incomplete'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03: 'covered: abstract pools and workload allocation in §3'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04: 'revise: findings 02 and 04'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05: 'revise: findings 02, 05 and 08'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-06: 'revise: finding 09'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07: 'revise: findings 06 and 10'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-08: 'revise: findings 06 and 08; failure domains named but protection incomplete'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-09: 'covered: inventory, lifecycle, telemetry and maintenance preconditions in §9; integration subject to finding 07'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-10: 'revise: finding 04'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-11: 'revise: finding 07'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-12: 'revise: findings 02 and 09'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-13: 'revise: finding 03'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-14: 'revise: findings 04, 05, 06 and 08'
+  QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01: 'covered: exact BOM revision/hash and material component dispositions identified'
+  QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-02: 'revise: findings 05, 06, 09 and 10'
+  QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03: 'revise: finding 04'
+  QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04: 'revise: finding 02; major SPOFs explicitly disclosed'
+  QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05: 'revise: findings 03 and 05'
+  QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-06: 'revise: findings 07 and 08'
+  QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07: 'revise: findings 01 and 07'
+  BND-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01: 'respected: no procurement workflow, prices or vendor-selection scorecard'
+  BND-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-02: 'respected: no acquisition dates'
+  BND-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03: 'respected: service implementation largely deferred to owners'
+  BND-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04: 'revise: finding 04; nominal compatibility and future validation conflated'
+unresolved_issues: []
