@@ -316,3 +316,154 @@ Members inside the Build VM (`pool.agents`, `pool.test`) are bounded by `memory.
 ### 5.5 Accelerator (deferred) preconditions
 
 The GPU (B11) stays DEFER / OPTIONAL until all of the following hold: (a) a measured trigger TRG-GPU (§12.2: local-inference latency/privacy/cost case or GPU-required application testing, §176); (b) SE11-AC-02 confirms PCI_E1 x16 availability — which means that if Fallback A (NIC in PCI_E1, §6.1a) is in use it must first be replaced by Fallback B or C with a passed SE11-AC-12b — plus 241 mm single-slot clearance and the 12V-2x6 cable; (c) SE11-AC-06 confirms measured full-load system draw plus 145 W ≤ 80 % of the 750 W PSU rating and that the per-candidate shutdown budgets of §8.3 still hold at the higher PD-A load; (d) SE11-AC-03 confirms a supported path to expose the GPU to a Linux VM on the client hypervisor (device assignment or partitioning) — if none exists, the fallback is a host-level local-model service exposed to VMs over the internal virtual network, recorded as a new SE11-DEC; (e) local models are registered under the same AI-dependency governance as external models (§177). Any accelerator above 145 W, a second accelerator or a dual-slot card is ESCALATE ARCHITECTURE IMPACT (SE11-ADR-04).
+
+## 6. Storage architecture (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05)
+
+### 6.1 Authoritative physical mapping of every volume (SE11-DEC-09 / SE11-ADR-09)
+
+This table is the single source of truth. Sizes are initial allocations (candidate envelope, ASM-SE11-03) and are thin-provisioned so that the sizing document can resize without re-mapping.
+
+| Volume | Pool | Physical device (slot, link) | Initial allocation | Notes |
+|---|---|---|---|---|
+| Host OS, hypervisor, WSL2 distro disk | `pool.admin` | **M2_1** 1 TB (Gen5 x4, CPU) | whole device | T0 system; rebuildable from version-controlled host build; encrypted (§13) |
+| Core VM system disk | `pool.core` | **M2_4** 4 TB (Gen4 x4, chipset) | 128 GB | storage-QoS minimum IOPS where available (defence in depth; M2_4 carries Highest-priority only) |
+| Core VM state disk (queues, registry, coordination) | `pool.core` | M2_4 | 256 GB | |
+| Data VM system disk | `pool.data` | M2_4 | 64 GB | |
+| Data VM database / search / cache disk | `pool.data` | M2_4 | 1.5 TB | database-consistent backups to T2 |
+| Platform container image layers (Core/Data services) | `pool.core`/`pool.data` | M2_4 | 256 GB | D-REB |
+| M2_4 headroom | — | M2_4 | ~1.8 TB | alert 70 %, review 85 % |
+| Validation VM system + replica data disks | `pool.validate` | **M2_2** 4 TB (Gen5 x4, CPU; shares with USB4) | 64 GB + 768 GB | production-like replica; fault injection only here; **protected per §6.1a (V_min)** |
+| Build VM system disk | `pool.build` | M2_2 | 64 GB | counted in B_max |
+| Build VM container layers, agent/test workspaces | `pool.build` members | M2_2 | 512 GB | D-REB; counted in B_max |
+| Artifact store (active artifacts, served to all pools over the internal virtual switch) | `pool.build` | M2_2 | 1 TB | D-BND; archival copies to T2; counted in B_max |
+| M2_2 headroom | — | M2_2 | ~1.6 TB (~1.1 TB under Fallback B) | |
+| Build cache / scratch | `pool.build` | **M2_3** 1 TB (Gen4 x2, chipset; shares with PCI_E3) | whole device | D-REB; first device to exhaust TBW; moves to M2_2 only under Fallback B (§6.1a) |
+| T2 durable | `pool.durable` | NAS RAID 6 (count per §6.7) over L1 | per §6.7 | snapshots, backups, evidence, archives, mirrors (§164) |
+| T3 isolated copy | — | off-site / hosted (provider per NT16, SE11-DEP-09) and/or T3-SUB isolated local medium (§6.3) | class D-IRR only | §6.3 |
+
+**Why the mapping deviates from the seed's literal role labels (SE11-DEC-09, conflict C2).** The BOM labels M2_2 "VM & artifact store" and M2_4 "platform data / DBs / containers" (§227.6). Placing *all* VM disks on M2_2 would put the Highest-priority Core and Data system disks on the same device as Medium-priority build artifacts, violating the reservation principle (§157: reserve "storage I/O … for stable platform operation") and SE11-REQ-02. The role labels are guidance on purpose, not an isolation rule; moving the Highest-priority VM disks to M2_4 keeps M2_4 entirely Highest-priority and M2_2 entirely High/Medium. Impact: M2_4 carries both VM system disks and the database — all one priority class; M2_2 carries Validation (High) with Build (Medium), which is exactly the contention that §6.1a bounds. SE11-REQ-02 is satisfied without exception.
+
+### 6.1a Storage protection matrix: Validation versus Build on M2_2 for every lane × QoS combination (SE11-REQ-16, corrects finding 005)
+
+**Why a matrix.** Validation ("VP validation / release assurance", High, §174) shares M2_2 with Build (Medium). Device separation protects Core/Data, not Validation. Protection of critical-validation I/O therefore needs a limiter in every supported combination of (i) the SE11-AC-02 lane-coexistence result for PCI_E3/M2_3 and (ii) the SE11-AC-03 result for hypervisor storage QoS.
+
+**Calibration rule (decidable; percentages are ASM-SE11-09 until SE19's measurements replace them).** In SE11-AC-04 measure for M2_2: `D2` = sustained 4 KiB random 70/30 read/write IOPS at queue depth 32 for 10 min, and `L2` = its p99 read latency at 25 % of D2. Then:
+
+- `V_min` (Validation guaranteed minimum, sum over Validation virtual disks) = max(1.5 × Validation's measured p95 IOPS demand under its heaviest Stage-1 suite, 20 % × D2); before the demand is measured, V_min = 20 % × D2.
+- `B_max` (Build aggregate maximum, sum over **all** Build VM virtual disks on M2_2: system, layers/workspaces, artifacts, and scratch when Fallback B applies) = 60 % × D2.
+- The remaining ≥ 20 % of D2 is unallocated so that the device never runs at the saturation knee.
+- Acceptance SE11-AC-12b: with Build driving every one of its M2_2 disks at queue depth 32 (and scratch wherever it is), Validation's 4 KiB random-read p99 ≤ 2 × L2 and Validation's achieved IOPS ≥ V_min for 10 min.
+
+**Lane-coexistence outcomes (SE11-AC-02) and their storage consequence:**
+
+| Outcome | Meaning | Scratch location | NIC slot |
+|---|---|---|---|
+| OK | PCI_E3 (NIC) and M2_3 (scratch) operate simultaneously at their expected widths | M2_3 | PCI_E3 |
+| Fallback A (SE11-DEC-12, preferred fallback) | They cannot coexist (or M2_3 drops below Gen4 x2) **and the GPU is deferred**: the NIC moves to PCI_E1 (Gen5 x16, CPU lanes), M2_3 keeps scratch | M2_3 | PCI_E1 — no storage change; TRG-GPU later requires Fallback B or C with a passed SE11-AC-12b before the GPU can take PCI_E1 |
+| Fallback B | They cannot coexist and PCI_E1 is needed (GPU adopted): NIC stays in PCI_E3, M2_3 is emptied, scratch becomes a 512 GB virtual disk on M2_2 | M2_2 (inside B_max) | PCI_E3 |
+| Fallback C | They cannot coexist; NIC moves to PCI_E2 (Gen3 x1); scratch stays on M2_3 | M2_3 | PCI_E2 — L1 is bounded by Gen3 x1 (~0.98 GB/s theoretical); allowed only if SE11-AC-05 still shows ≥ 0.7 GB/s host↔NAS (SE11-REQ-04) |
+
+**Protection matrix — mechanism and admissibility for every combination:**
+
+| Lane outcome | Hypervisor storage QoS (SE11-AC-03) | Required limiter | Validation impact statement | Admissible? |
+|---|---|---|---|---|
+| OK / Fallback A / Fallback C (scratch on M2_3) | available | QoS minimum = V_min on Validation disks; QoS maximum = B_max aggregate on Build disks | Validation shares M2_2 with Build VM disk + layers + artifacts; bounded by B_max | Yes; SE11-AC-12b must pass |
+| OK / Fallback A / Fallback C | unavailable | **Guest-side limiter:** cgroup v2 `io.max` in the Build VM on every block device backed by M2_2, aggregate riops + wiops ≤ B_max (and a bytes cap at 60 % of measured M2_2 sequential throughput); Validation unthrottled; version-controlled and verified in SE11-AC-03 | As above; the limiter is inside the Build guest rather than the hypervisor, so a misconfigured guest can exceed it — residual recorded in SE11-RISK-13 | Yes; SE11-AC-12b must pass |
+| Fallback B (scratch on M2_2) | available | QoS as row 1 with the scratch disk counted inside B_max; QoS maximum on scratch individually ≤ 50 % of B_max | **Validation is affected** (v2 wrongly called this Build-internal): Build now adds cache/scratch traffic to the same device; headroom falls to ~1.1 TB; TBW on M2_2 rises (TRG-NVME-TBW) | Yes; SE11-AC-12b must pass with scratch load included |
+| Fallback B | unavailable | Guest `io.max` covering the scratch block device as well, aggregate ≤ B_max | As above plus the guest-side residual | **Only if SE11-AC-12b passes with scratch load included.** If it fails, this combination is **disallowed**: remedy in order — Fallback A (if the GPU is not yet adopted), Fallback C (if SE11-AC-05 passes), or ESCALATE ARCHITECTURE IMPACT (REV-STORAGE-HOT: the host NVMe topology cannot carry scratch + artifacts + validation; a NIC class or board class change is architectural) |
+
+**Admission consequence.** A Validation VM may be started on M2_2 only when its §6.1a row is implemented and SE11-AC-12b has passed on that combination; the row in force is recorded in the configuration fingerprint (§11.3) and in the contract record (§18.2).
+
+### 6.2 Tiers and dataset classes
+
+| Tier | Device(s) | Role (seed) | Durability boundary | Policy owner |
+|---|---|---|---|---|
+| T0 system | M2_1 | Windows + WSL2 (§227.5) | Rebuildable; no unique data | SE20 (host build), SE17 (encryption) |
+| T0 scratch | M2_3 (Gen4 x2) or M2_2 under Fallback B | Build cache / scratch (§227.5) | Disposable | SE11 |
+| T1 hot, Highest | M2_4 | Core/Data VMs, platform data, DBs, platform containers | Independent volume; snapshot + replication to T2 | SE12 (data), EL (VM definitions) |
+| T1 hot, High/Medium | M2_2 | Validation/Build VMs, artifact store | Independent volume; archival replication to T2 | SE12 (artifact retention) |
+| T2 durable | NAS RAID 6 | Backups, snapshots, release evidence, VM/container archives, artifacts, mirrors (§164) | Dual-parity array + snapshots; "not the only backup" (§164) | SE12 |
+| T3 isolated copy | Off-site / hosted, encrypted; or T3-SUB isolated local medium (§6.3) | "independent/off-site or otherwise isolated copy" for irreplaceable data (§164) | Independent of room, UPS, NAS and host | SE12 (policy), SE17 (keys) |
+
+**Dataset classes (provisional default, ASM-SE11-08; SE12 is the classification owner, SE11-DEP-04):**
+
+| Class | Definition | D-IRR sub-classes used by the protection states | Minimum protection |
+|---|---|---|---|
+| D-IRR | Irreplaceable: cannot be re-derived from any other platform data | `REPO` (source repositories, IaC, configuration), `DB` (non-synthetic platform databases), `EVID` (release-evidence packages, decision logs), `INV` (inventory records, telemetry baselines required by evidence), `KEYS` (secret/key backups) | T1 + T2 + verified T3, state PROTECTED before the dataset exists (§6.3) |
+| D-BND | Bounded loss: re-derivable from D-IRR within an accepted window | build artifacts, locally built images, validation results, telemetry history | T1 + T2; loss window accepted by SE12 |
+| D-REB | Rebuildable from definitions or external sources | caches, scratch, pulled container layers, VM system disks | T1 only |
+
+### 6.3 Protection states, permissions and expiry (SE11-REQ-13, SE11-REQ-17; corrects finding 009)
+
+**Per-class state.** Each D-IRR sub-class *c* carries: `t3_last_ok(c)` = timestamp of the last successful, verified T3 copy; `age(c)` = now − `t3_last_ok(c)`; `A_max` = maximum copy age (default 24 h, SE11-NFR-05); `G` = grace (default 24 h); both defaults are ASM-SE11-10 until SE12 binds them (SE11-DEP-04). States:
+
+| State of class c | Definition | Create a new dataset of class c | Mutate an existing dataset of class c | Mandatory actions |
+|---|---|---|---|---|
+| ABSENT | No dataset of class c exists on the platform | **Prohibited** until SE11-AC-07b passes for class c (T3 mechanism commissioned, restore verified, `t3_last_ok` set) | n/a | — |
+| PROTECTED | Datasets exist; `age(c)` ≤ A_max; last restore verification passed | Permitted | Permitted | T3 copy at interval ≤ A_max; `SIG-PROTECTION-STATE` not raised |
+| DEGRADED-IN-BUDGET | Datasets exist; A_max < `age(c)` ≤ A_max + G (T3 mechanism lost, internet down, copy failing) | **Prohibited** (no new datasets/classes of D-IRR are admitted) | Permitted | `SIG-PROTECTION-STATE` raised within 60 s; T3 copy retried every 1 h; SE20 prepares T3-SUB (encrypted isolated local copy, §6.2) so it can be taken before expiry; exposure window logged |
+| EXPIRED | `age(c)` > A_max + G, **or** the last restore verification failed | Prohibited | Permitted **only while a T3-SUB copy of class c with age ≤ A_max exists**; otherwise the class is placed in **write-freeze** (read-only) by its owning service until a T3 or T3-SUB copy succeeds | SE20 incident; SE12 decides whether to extend via T3-SUB or hold the freeze; every hour in EXPIRED is logged against the stage's exposure budget |
+
+**Platform-level derived state (published as `SIG-PL-STATE`):** `PL-T2` = SE11-AC-07a passed and every D-IRR class is ABSENT (only D-BND/D-REB data exist); `PL-T3` = every existing D-IRR class is PROTECTED; `PL-DEG` = at least one class DEGRADED-IN-BUDGET and none EXPIRED; `PL-EXP` = at least one class EXPIRED. Before SE11-AC-07a the platform is `PL-0` (unprotected-initial): only D-REB and synthetic data may exist.
+
+**Invariants (reconciled with §6.6, §9 and SE11-AC-10).** (I1) A D-IRR dataset of class c exists only if class c has been PROTECTED at least once (creation gate). (I2) In `PL-T2` no D-IRR data exists. (I3) In `PL-DEG`/`PL-EXP` D-IRR data **does** exist and is exposed to FD-STORAGE/FD-ROOM for at most `age(c)`; the exposure is bounded by A_max + G plus the T3-SUB age. (I4) SE11-AC-10 passes only in `PL-T2` (no D-IRR) or `PL-T3` (all PROTECTED). (I5) T3-dependent recovery (§6.6) is valid for class c only from its last successful T3 or T3-SUB copy; the loss window is `age(c)` at the moment of loss.
+
+**Class-specific activation.** `REPO`: the T3 copy is a hosted remote at an external repository service, active before any local hardware is commissioned (§160 keeps authoritative source in version control outside any single host), so `REPO` reaches PROTECTED on day one. `DB`, `EVID`, `INV`, `KEYS`: the encrypted off-site copy mechanism must pass SE11-AC-07b for that class before the first non-synthetic record is admitted.
+
+**Outage tolerance (corrects FD-INTERNET).** The tolerance of class c to loss of the T3 path is its **remaining copy-age budget**, `A_max − age(c)` at the moment the outage starts (then G of degraded operation), not a fixed 24 h. A class whose last copy is 20 h old enters DEGRADED-IN-BUDGET 4 h into an internet outage.
+
+**Restoration.** T3 path restored → a full copy of class c completes → sample restore verification passes → `t3_last_ok(c)` updated → PROTECTED; any write-freeze is lifted by the owning service on `SIG-PROTECTION-STATE` clearing.
+
+**Enforcement and ownership.** SE11 publishes the states and timestamps (`SIG-PROTECTION-STATE`, `SIG-PL-STATE`, §10.3). Creation gating, mutation permission and write-freeze are enforced by the owning services (EL for admission in Definition of Ready, SE12 for the data stores, SE20 for the operational checklist) — unmet dependencies SE11-DEP-02/04/07. SE11 has no hardware-level backstop for a write-freeze and does not claim one. T3-SUB is an encrypted copy to a removable medium or a second independent location kept outside the room (§164 "otherwise isolated copy"), restore-verified in SE11-AC-07b; it is a bridging measure, not a replacement for T3.
+
+**Verification.** SE11-AC-07b (activation per class), SE11-AC-07c (expiry drill: internet/T3 loss starting at `age` = A_max − 1 h; DEGRADED at +1 h, EXPIRED at +25 h, permissions enforced, T3-SUB or freeze observed, recovery to PROTECTED after restoration), SE11-AC-10 (I4).
+
+### 6.4 Bandwidth / IOPS / latency assumptions (device-class figures from the BOM; measured values replace them in SE11-AC-04)
+
+| Path | Nominal from BOM | Engineering assumption used for design |
+|---|---|---|
+| M2_1, M2_2, M2_4 (Gen4 x4 devices) | up to 7,300 / 6,300 MB/s (§227.5–§227.6) | Sustained mixed workload 2–4 GB/s per device; sub-millisecond latency; NVMe is not the first bottleneck; D2 and L2 measured for §6.1a |
+| M2_3 (Gen4 x2 slot shared with PCI_E3) | device 7,300 MB/s; slot ≈ half of x4 | ≈ 3–3.5 GB/s ceiling; acceptable for scratch; verified in SE11-AC-02/04 |
+| Host ↔ NAS over 10 GbE (L1) | 10 Gb/s ≈ 1.1–1.2 GB/s wire (Fallback C: ≤ ~0.98 GB/s) | 0.7–1.0 GB/s sustained for backup/artifact transfer; a 4–6 drive RAID 6 CMR array delivers on the order of 0.5–1.0 GB/s sequential and far lower random IOPS — the NAS is never used for random-IO workloads (§164) |
+| Endurance | 600 TBW (1 TB), 2,400 TBW (4 TB) (§227.5–§227.6) | Scratch (M2_3) exhausts TBW first; under Fallback B, M2_2 consumption rises; TBW telemetry mandatory (§10.3); replacement by specification class (§11.4) |
+
+### 6.5 RAID / replication boundaries
+
+- Host NVMe: no RAID. Independence of M2_2 and M2_4 is the only host-level isolation; redundancy is by replication to T2 (SE11-ADR-05). Rationale: host mirroring would double NVMe cost for a tier whose durability requirement is met by snapshot + replication and would not protect against host loss, the dominant failure domain (§9).
+- NAS: RAID 6 at any drive count ≥ 4 (dual parity is mandatory at 20 TB per drive because the rebuild window — planning assumption 1–3 days under concurrent load, ASM-SE11-04 — must tolerate a second loss). Snapshots guard against logical corruption; T3 guards against array, enclosure, power or site loss (§164).
+- Replication is one-way T1 → T2 → T3; T2 never serves as a live datastore for VMs or databases.
+- The BOM's NVMe is a client-class device; power-loss protection of in-flight writes is **not asserted** (§11.2). Crash consistency therefore relies on filesystem journaling in every VM, database write-ahead logging with synchronous commit (SE12), and NAS copy-on-write; all are verified by the abrupt-loss drill SE11-AC-13 (SE11-NFR-07).
+
+### 6.6 Recovery expectations (hardware-capable targets stated to SE12; SE12 sets the binding RPO/RTO)
+
+**T2-only recoveries (no T3 dependency):**
+
+| Scenario | Hardware-capable target | Dependency |
+|---|---|---|
+| M2_4 failure (Core + Data VMs, platform data) | Full platform outage; restore both VMs and database from the last T2 snapshot/backup; data loss ≤ snapshot interval (≤ 1 h, SE11-NFR-05); RTO ≤ 4 h per VM | Spare NVMe of the §11.4 class; SE12 schedule |
+| M2_2 failure (Validation + Build VMs, artifacts; scratch too under Fallback B) | Build/validation outage; runtime continues; restore from T2 archives or rebuild from definitions; D-BND loss within SE12's accepted window | Spare NVMe |
+| M2_1 failure (host OS) | All VMs stop until the host OS is rebuilt from the version-controlled host build onto a replacement device; VM disks on M2_2/M2_4 remain intact | Spare NVMe; host build definition in version control |
+| M2_3 failure | Rebuild caches; no data loss; interim Fallback B mapping if no spare | Spare NVMe or fallback mapping |
+| Single NAS drive failure | No data loss; degraded; rebuild window ASM-SE11-04; replacement drive of equivalent class | Free bays allow a hot spare as an SE12 decision |
+| Two concurrent NAS drive failures | No data loss (RAID 6) | — |
+| Host loss (board/CPU/PSU) with intact NVMe | Move the NVMe devices to a replacement host of the §11.4 class or restore VMs to a hosted equivalent (§160, §168) | Hardware-independent definitions (SE11-REQ-05) |
+
+**T3-dependent recoveries (valid per class from its last successful T3/T3-SUB copy; loss window = `age(c)` at the moment of loss, §6.3 I5; in `PL-T2` no D-IRR data exists, so the residual is the loss of D-BND/D-REB only):**
+
+| Scenario | Hardware-capable target | Dependency |
+|---|---|---|
+| Third NAS drive failure before rebuild completes (array loss) | Restore each D-IRR class from T3 with loss ≤ `age(c)`; D-BND re-derived | Verified T3 copy per class |
+| NAS enclosure loss | T1 continues without a local backup target (degraded, time-boxed by SE12); D-IRR protected by T3 until NAS is replaced; classes move to DEGRADED when their T2→T3 pipeline depends on the NAS | T3 |
+| Host loss with NVMe loss, room/site loss (FD-ROOM) | Rebuild on replacement or hosted infrastructure from T3 (D-IRR, loss ≤ `age(c)`) and definitions; D-BND re-derived | T3, hosted fallback |
+
+### 6.7 Capacity headroom and NAS capacity candidates (SE11-DEC-06)
+
+| Tier | Candidate / installed | Headroom rule | Expansion path |
+|---|---|---|---|
+| T1 (M2_2 + M2_4) | 2 × 4 TB (fixed by B6 class) | Alert 70 %, architecture review 85 % (REV-STORAGE-HOT) | No free M.2 slots: larger devices of the same class (scale-up) or artifact store fronted by T2; SATA ×4 for cold tiers only |
+| T2 NAS — **N-A** (default) | 4 × 20 TB RAID 6 → 40 TB nominal, ≈ 36.4 TiB usable (derived with the seed's 80 TB → 72.8 TiB ratio, ASM-SE11-04); 4 bays free | Alert 70 %, review 80 % | Add same-class drives to free bays on TRG-NAS-CAP (online array expansion support by the NAS OS not established — SE11-AC-01 item) |
+| T2 NAS — **N-B** | 6 × 20 TB RAID 6 → ≈ 72.8 TiB usable (seed reference); 2 bays free | as above | 2 free bays |
+| T2/T3 — **N-C** | Hosted object storage for T2 and/or T3 (NAS deferred or absent) | provider quota | Hosted elasticity; acceptable per §238; economics unknown (SE11-DEP-08) |
+| T3 | Must hold at least the D-IRR set per class; T3-SUB medium sized to the same set | n/a | Provider/medium per SE12 and NT16 (SE11-DEP-04/09) |
+
+**Decision rule (SE11-DEC-06).** Let V be SE12's modelled retention volume for the first two stages (D-IRR + D-BND copies at the retention policy, including snapshot overhead). Choose N-A if V ≤ 22 TiB (≈ 60 % of N-A usable); N-B if 22 TiB < V ≤ 44 TiB; above 44 TiB the answer is REV-STORAGE (architecture revision), not simply more drives; N-C if gate G-LOCAL fails for the NAS. If the NAS must be commissioned before the model exists, **N-A** is installed (H.1/H.3) and the choice is recorded as SE11-DEC-06a in the sizing document. **Six drives are never adopted on the strength of this document alone.**
