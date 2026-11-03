@@ -7,8 +7,14 @@
    (read on demand)*, and a seed from the seed index when a register row you rely on points to a section whose original
    wording or data you need. Use `list_documents` on your own folder to see what you have already produced.
 3. If `pass` is REVISE: read the previous review findings in your context first. Every blocking and major finding must be
-   corrected; say where. Minor findings: correct or justify. Then re-read the current file with `read_document` to obtain
-   its `sha` for `expected_sha`.
+   corrected; say where (a short `## Revision notes` table: finding id → what changed, section). Minor findings: correct
+   or justify. Then re-read the current file with `read_document` to obtain its `sha` for `expected_sha`.
+   **Revision discipline** — close a finding by the smallest change that closes it: correct the statement, remove the
+   unsupported claim, or make the gap explicit as a labelled assumption / evidence gate with owner and stage. Never close
+   a finding by adding a new mechanism, protocol, state machine or procedure that your outline criteria do not require —
+   that content belongs to another document class or a later stage; reference or depend on it instead. A revision must
+   not grow the document by more than about a tenth; a document that keeps growing is diverging, and the machine rejects
+   any document above its size limit (see Writing rules). Rewrite the file (first write replaces); append only new sections.
 4. Plan the document against the outline: one section (or explicit disposition) per criterion, in the standard's order.
 5. Write the document. Then self-review it against the completion checks below before writing it — this is the only review
    you control; the peer reviewer sees the same checklist.
@@ -41,7 +47,8 @@
   remove ambiguity.
 - Every requirement, decision, assumption, risk and acceptance criterion you introduce gets a stable id: `<ROLE>-REQ-nn`,
   `<ROLE>-DEC-nn`, `ASM-<ROLE>-nn`, `<ROLE>-RISK-nn`, `<ROLE>-AC-nn`.
-- Length is whatever the criteria need — not shorter, not padded.
+- Length is whatever the criteria need — not shorter, not padded. Hard limit for a single document: 160,000 characters
+  (the machine rejects more); a sound document of this kind is usually 30,000–90,000.
 - The exclusions (`BND-…`) in your context name content that belongs to another document. Reference, do not include.
 - Stage-0 register tasks (`PL-REQ-REGISTER-G01..G04`, `PL-REQ-ID-REGISTER`) add `seed_coverage` to the completion event
   and follow the Stage-0 rules in author-non-engineering.md. Compilation parts (`EL-COMPILED-PART-*`) follow

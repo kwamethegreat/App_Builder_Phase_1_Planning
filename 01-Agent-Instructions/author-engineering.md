@@ -16,6 +16,10 @@ The reader is another engineer who must implement without asking you anything.
 - Decisions: each material technology or design choice is an ADR entry (`<ROLE>-ADR-nn`) with alternatives and rationale;
   alternatives you rejected stay rejected in later documents unless a new ADR supersedes them.
 - Estimates and sequencing inputs are ranges with stated assumptions, never single numbers without basis.
+- Facts outside the corpus (current vendor support, part availability, measured workloads, certifications) cannot be
+  verified in a documentation run. State the specification class, record an **evidence gate** (`<ROLE>-GATE-nn`: what is
+  verified, by whom, at which stage, what happens if it fails) and dispose the criterion `covered`. Do not design around
+  the uncertainty with new mechanisms; do not claim the check was done.
 - Cross-domain dependencies are listed with the owning role, the contract or milestone, and the stage by which they are needed.
 - Greenfield: no pre-existing infrastructure, topology, cloud account layout or sunk cost is assumed (workflow §G.7).
   Provision only for measured or forecast need; design portability and provider fallback from the first build.
