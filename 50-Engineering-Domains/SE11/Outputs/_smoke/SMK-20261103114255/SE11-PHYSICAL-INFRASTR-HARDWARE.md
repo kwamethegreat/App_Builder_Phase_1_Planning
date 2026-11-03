@@ -378,3 +378,320 @@ Members inside the Build VM (`pool.agents`, `pool.test`) are bounded by `memory.
 
 The GPU (B11) stays DEFER / OPTIONAL until all of the following hold: (a) a measured trigger TRG-GPU (§12.2: local-inference latency/privacy/cost case or GPU-required application testing, §176); (b) SE11-AC-02 confirms PCI_E1 x16 availability — which means that if Fallback A (NIC in PCI_E1, §6.1a) is in use it must first be replaced by Fallback B or C with a passed SE11-AC-12b — plus 241 mm single-slot clearance and the 12V-2x6 cable; (c) SE11-AC-06 confirms measured full-load system draw plus 145 W ≤ 80 % of the 750 W PSU rating and that the per-candidate shutdown budgets of §8.3 still hold at the higher PD-A load; (d) SE11-AC-03 confirms a supported path to expose the GPU to a Linux VM on the client hypervisor (device assignment or partitioning, FC-07) — if none exists, the fallback is a host-level local-model service exposed to VMs over the internal virtual network, recorded as a new SE11-DEC; (e) local models are registered under the same AI-dependency governance as external models (§177). Any accelerator above 145 W, a second accelerator or a dual-slot card is ESCALATE ARCHITECTURE IMPACT (SE11-ADR-04).
 
+
+## 6. Storage architecture (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05)
+
+### 6.1 Authoritative physical mapping of every volume (SE11-DEC-09 / SE11-ADR-09)
+
+This table is the single source of truth for the default mapping (Mapping-D). Sizes are initial allocations (candidate envelope, ASM-SE11-03) and are thin-provisioned so that the sizing document can resize without re-mapping. The alternative Mapping-V of §6.1a swaps the Validation disks and scratch between M2_2 and M2_3; nothing else changes.
+
+| Volume (guest device name) | Pool | Physical device (slot, link) | Initial allocation | Notes |
+|---|---|---|---|---|
+| Host OS, hypervisor, SE11 host agent store (incarnation record, event log ≤ 1 GB, lease store, bootstrap secret store, local-channel socket), WSL2 distro disk | `pool.admin` | **M2_1** 1 TB (Gen5 x4, CPU) | whole device | T0 system; rebuildable from the version-controlled host build in `REPO-EXT`; encrypted (§13) |
+| Core VM system disk | `pool.core` | **M2_4** 4 TB (Gen4 x4, chipset) | 128 GB | storage-QoS minimum IOPS where available (defence in depth; M2_4 carries Highest-priority only) |
+| Core VM state disk (queues, registry, coordination) | `pool.core` | M2_4 | 256 GB | |
+| Data VM system disk | `pool.data` | M2_4 | 64 GB | |
+| Data VM database / search / cache disk | `pool.data` | M2_4 | 1.5 TB | database-consistent backups to T2 |
+| Platform container image layers (Core/Data services) | `pool.core`/`pool.data` | M2_4 | 256 GB | D-REB |
+| M2_4 headroom | — | M2_4 | ~1.8 TB | alert 70 %, review 85 % |
+| Validation VM system disk (`val-sys`) + replica data disk (`val-data`) | `pool.validate` | **M2_2** 4 TB (Gen5 x4, CPU; shares with USB4) — M2_3 under Mapping-V | 64 GB + 768 GB | production-like replica; fault injection only here; **protected per §6.1a (V_min)** |
+| Build VM system disk (`bld-sys`) | `pool.build` | M2_2 | 64 GB | inside B_max (root/system allowance + slice cap, §6.1a) |
+| Build VM container layers, agent/test workspaces (`bld-ws`) | `pool.build` members | M2_2 | 512 GB | D-REB; inside B_max |
+| Artifact store (`bld-art`; active artifacts, served to all pools over the internal virtual switch) | `pool.build` | M2_2 | 1 TB | D-BND; archival copies to T2; inside B_max |
+| M2_2 headroom | — | M2_2 | ~1.6 TB (~1.1 TB when scratch is on M2_2) | |
+| Build cache / scratch (`bld-scr`) | `pool.build` | **M2_3** 1 TB (Gen4 x2, chipset; shares with PCI_E3) — a 512 GB virtual disk on M2_2 under Fallback B or Mapping-V | whole device | D-REB; first device to exhaust TBW |
+| T2 durable (incl. the `REPO-EXT` mirror) | `pool.durable` | NAS RAID 6 (count per §6.7) over L1 | per §6.7 | snapshots, backups, evidence, archives, mirrors (§164) |
+| T3 isolated copy | — | off-site / hosted (provider per NT16, SE11-DEP-09) and/or T3-SUB isolated local medium (§6.3) | local D-IRR classes only | §6.3 |
+
+**Why the mapping deviates from the seed's literal role labels (SE11-DEC-09, conflict C2).** The BOM labels M2_2 "VM & artifact store" and M2_4 "platform data / DBs / containers" (§227.6). Placing *all* VM disks on M2_2 would put the Highest-priority Core and Data system disks on the same device as Medium-priority build artifacts, violating the reservation principle (§157: reserve "storage I/O … for stable platform operation") and SE11-REQ-02. The role labels are guidance on purpose, not an isolation rule; moving the Highest-priority VM disks to M2_4 keeps M2_4 entirely Highest-priority and M2_2 entirely High/Medium. Impact: M2_4 carries both VM system disks and the database — all one priority class; M2_2 carries Validation (High) with Build (Medium), which is exactly the contention that §6.1a bounds. SE11-REQ-02 is satisfied without exception.
+
+### 6.1a Storage I/O budget and protection matrix: Validation versus Build on M2_2 for every lane × QoS combination (SE11-REQ-16, SE11-DEC-16)
+
+**Why a budget.** Validation ("VP validation / release assurance", High, §174) shares M2_2 with Build (Medium) under Mapping-D. Device separation protects Core/Data, not Validation. Protection of critical-validation I/O therefore needs a limiter in every supported combination of (i) the SE11-AC-02 lane-coexistence result for PCI_E3/M2_3 and (ii) the SE11-AC-03 result for hypervisor storage QoS — and the limiter's budget must never exceed the device.
+
+**Measured inputs (SE11-AC-04, M2_2):** `D2` = sustained 4 KiB random 70/30 read/write IOPS at queue depth 32 for 10 min; `S2` = sustained sequential throughput (MB/s, 128 KiB, queue depth 8); `L2` = p99 read latency at 25 % of D2. The limiter's IOPS unit must be the unit D2 was measured in: if the hypervisor normalises I/O size, D2 is re-measured with that normalisation and all budgets are expressed in normalised IOPS.
+
+**Budget identity and calibration (decidable; percentages are ASM-SE11-09/-12 until SE19's measurements replace them).**
+
+| Symbol | Definition | Default |
+|---|---|---|
+| H_io | Unallocated headroom so the device never runs at its saturation knee | 0.20 × D2 (bytes: 0.20 × S2) |
+| A | Allocatable = D2 − H_io | 0.80 × D2 |
+| Vdem | Validation's measured p95 aggregate IOPS during its heaviest Stage-1 suite | 0 before measurement |
+| V_min | Validation guaranteed minimum (sum over `val-sys`, `val-data`) = max(1.5 × Vdem, 0.20 × D2) | 0.20 × D2 |
+| B_floor | Build's minimum useful aggregate IOPS, below which build throughput misses its own NFR | 0.20 × D2 (ASM-SE11-12; SE01/EL may raise it) |
+| **Feasibility test** | **V_min + B_floor ≤ A**, i.e. V_min ≤ 0.60 × D2, i.e. Vdem ≤ 0.40 × D2 | evaluated at every calibration |
+| B_max | Build aggregate maximum (sum over **all** Build VM virtual disks on M2_2) = **A − V_min** | 0.60 × D2 when V_min is at its floor |
+| Identity | **V_min + B_max + H_io = D2 by construction**; the same identity holds in bytes with S2 (V_bytes_min = max(1.5 × Vdem_bytes, 0.20 × S2), B_bytes_max = 0.80 × S2 − V_bytes_min) | always |
+
+Examples: Vdem = 0.10 D2 → V_min = 0.20 D2, B_max = 0.60 D2. Vdem = 0.30 D2 → V_min = 0.45 D2, B_max = 0.35 D2 (≥ B_floor: feasible). Vdem = 0.40 D2 → V_min = 0.60 D2, B_max = 0.20 D2 = B_floor (boundary: feasible). Vdem = 0.45 D2 → V_min = 0.675 D2, B_max would be 0.125 D2 < B_floor → **infeasible** → remedies below.
+
+**Deterministic response when Validation's demand cannot fit (remedies, applied in order to every matrix row):**
+
+| Remedy | Content | Precondition | Effect on the budget |
+|---|---|---|---|
+| R1 — **Mapping-V** (SE11-ADR-12) | Validation VM disks (`val-sys` + `val-data`, 832 GB) move to the M2_3 device; scratch becomes a 512 GB virtual disk `bld-scr` on M2_2 inside Build's budget. Validation then shares no device with Build | M2_3 operational at ≥ Gen4 x2 (lane outcomes OK, A or C — not Fallback B); Validation's measured demand satisfied on the x2 device (SE11-AC-12b re-run with Validation alone on M2_3: p99 ≤ 2 × L3, L3 = that device's unloaded p99 at 25 % of its D3); Validation capacity ≤ 90 % of the device | On M2_2: V_min not applicable; B_max = A = 0.80 D2 over `bld-sys`, `bld-ws`, `bld-art`, `bld-scr` (headroom protection only). On M2_3: Validation alone; no limiter needed |
+| R2 — REV-STORAGE-HOT | Architecture revision (§12.3): the host NVMe topology cannot carry Validation and Build at the measured demands | R1 precondition not met (Fallback B in force, or Validation's demand exceeds the x2 device, or capacity) | None — revision, not a hardware addition |
+
+**Partition of B_max across devices and cgroups (SE11-DEC-16).** The Build VM's virtual disks on M2_2 are separate guest block devices; the budget is split by fixed shares that sum to 100 % of B_max (IOPS and bytes alike), including an allowance for guest root/system I/O that no cgroup controls:
+
+| Guest block device | Without scratch on M2_2 (Mapping-D, lane OK/A/C) | With scratch on M2_2 (Fallback B or Mapping-V) | Controlled by |
+|---|---|---|---|
+| `bld-sys` — root/system I/O not under a controllable cgroup (init, journal, package cache) | 10 % allowance (ASM-SE11-14) | 10 % allowance | journald rate-limit, package cache off-peak only; **measured, not capped** in the guest |
+| `bld-sys` — `build.slice` cap | 5 % | 5 % | `io.max` on `build.slice` for the `bld-sys` device |
+| `bld-ws` | 40 % | 25 % | `io.max` on `build.slice` for the `bld-ws` device |
+| `bld-art` | 45 % | 30 % | `io.max` on `build.slice` for the `bld-art` device |
+| `bld-scr` | — | 30 % | `io.max` on `build.slice` for the `bld-scr` device |
+| **Sum** | **100 % of B_max** | **100 % of B_max** | verified by hypervisor per-virtual-disk counters |
+
+Rules: (1) every workload in the Build VM — runners, containers, artifact service, `pool.agents`, `pool.test`, `pool.background` — runs under `build.slice`; nothing outside it may write except the init system and journal; (2) with hypervisor QoS available, the same shares are applied as per-virtual-disk maxima (for `bld-sys` the maximum is 15 % = allowance + slice cap, because the hypervisor cannot distinguish the two) and Validation disks receive QoS minima summing to V_min (`val-sys` 10 %, `val-data` 90 %); (3) with QoS unavailable, `io.max` on `build.slice` carries the per-device caps and Validation is unthrottled; (4) **summed-traffic verification:** during SE11-AC-12b the hypervisor's per-virtual-disk counters for all Build disks are summed every 60 s; the row fails if the sum exceeds B_max by more than 5 % in any window — this catches the uncontrolled root allowance being exceeded as well as a misconfigured slice.
+
+**Lane-coexistence outcomes (SE11-AC-02) and their storage consequence:**
+
+| Outcome | Meaning | Scratch location (Mapping-D) | NIC slot | Mapping-V available? |
+|---|---|---|---|---|
+| OK | PCI_E3 (NIC) and M2_3 (scratch) operate simultaneously at their expected widths | M2_3 | PCI_E3 | Yes (Validation on M2_3 shares chipset lanes with the NIC; coexistence already proven) |
+| Fallback A (SE11-DEC-12, preferred fallback) | They cannot coexist (or M2_3 drops below Gen4 x2) **and the GPU is deferred**: the NIC moves to PCI_E1 (Gen5 x16, CPU lanes), M2_3 keeps scratch | M2_3 | PCI_E1 — TRG-GPU later requires Fallback B or C with a passed SE11-AC-12b before the GPU can take PCI_E1 | Yes (M2_3 free of sharing) |
+| Fallback B | They cannot coexist and PCI_E1 is needed (GPU adopted): NIC stays in PCI_E3, M2_3 is emptied, scratch becomes `bld-scr` on M2_2 | M2_2 (inside B_max) | PCI_E3 | **No** (M2_3 unusable) |
+| Fallback C | They cannot coexist; NIC moves to PCI_E2 (Gen3 x1); scratch stays on M2_3 | M2_3 | PCI_E2 — L1 bounded by Gen3 x1 (~0.98 GB/s theoretical); allowed only if SE11-AC-05 still shows ≥ 0.7 GB/s host↔NAS (SE11-REQ-04) | Yes |
+
+**Protection matrix — mechanism, admissibility and remedy for every combination:**
+
+| Lane outcome | Hypervisor storage QoS (SE11-AC-03) | Required limiter | Validation impact statement | Admissible? | If the feasibility test or SE11-AC-12b fails |
+|---|---|---|---|---|---|
+| OK / Fallback A / Fallback C (scratch on M2_3) | available | QoS minima = V_min on Validation disks; QoS maxima = partitioned B_max on Build disks (table above, column "without scratch") | Validation shares M2_2 with `bld-sys`, `bld-ws`, `bld-art`; bounded by B_max | Yes; SE11-AC-12b must pass | R1 Mapping-V → else R2 |
+| OK / Fallback A / Fallback C | unavailable | **Guest-side limiter:** `io.max` on `build.slice` per device (column "without scratch"); Validation unthrottled; version-controlled and verified in SE11-AC-03; summed-traffic verification mandatory | As above; a misconfigured guest can exceed the budget — residual SE11-RISK-13, bounded by the summed-traffic check | Yes; SE11-AC-12b must pass | R1 Mapping-V → else R2 |
+| Fallback B (scratch on M2_2) | available | QoS as row 1 with the "with scratch" shares; `bld-scr` capped at 30 % of B_max | **Validation is affected:** Build adds cache/scratch traffic to the same device; headroom falls to ~1.1 TB; TBW on M2_2 rises (TRG-NVME-TBW) | Yes; SE11-AC-12b must pass with scratch load included | Fallback A (if the GPU is not yet adopted) → Fallback C (if SE11-AC-05 passes) → **R2** (R1 unavailable: M2_3 unusable) |
+| Fallback B | unavailable | Guest `io.max` with the "with scratch" shares, including `bld-scr` | As above plus the guest-side residual | **Only if SE11-AC-12b passes with scratch load included** | Fallback A → Fallback C → **R2** |
+| **Mapping-V** (any lane outcome except B) | available or unavailable | On M2_2: `build.slice` caps (or QoS maxima) with the "with scratch" shares summing to B_max = 0.80 D2; on M2_3: none (Validation alone) | Validation isolated at device level; its ceiling is the x2 device's capability (SE11-AC-12b re-run on M2_3) | Yes when R1 preconditions hold | R2 |
+
+**Admission consequence.** A Validation VM may be started only when its row is implemented, the feasibility test passes for the current Vdem and SE11-AC-12b has passed on that combination; the row in force (including Mapping-D/Mapping-V, V_min, B_max and the shares) is recorded in the configuration fingerprint (§11.3) and in the baseline contract (§18.2). Re-calibration is mandatory whenever Validation's measured p95 changes by more than 20 % or Build adds a disk.
+
+### 6.2 Tiers and dataset classes (bootstrap boundary made explicit; SE11-REQ-21)
+
+| Tier | Device(s) | Role (seed) | Durability boundary | Policy owner |
+|---|---|---|---|---|
+| T0 system | M2_1 | Windows + WSL2 + SE11 host agent (§227.5) | Rebuildable from `REPO-EXT`; the host agent's event log, incarnation record and lease store are durable but not unique data (§18.2 recovers from their loss by a new incarnation and fail-safe leases) | SE20 (host build), SE17 (encryption) |
+| T0 scratch | M2_3 (Gen4 x2) or `bld-scr` on M2_2 | Build cache / scratch (§227.5) | Disposable | SE11 |
+| T1 hot, Highest | M2_4 | Core/Data VMs, platform data, DBs, platform containers | Independent volume; snapshot + replication to T2 | SE12 (data), EL (VM definitions) |
+| T1 hot, High/Medium | M2_2 (and M2_3 for Validation under Mapping-V) | Validation/Build VMs, artifact store | Independent volume; archival replication to T2 | SE12 (artifact retention) |
+| T2 durable | NAS RAID 6 | Backups, snapshots, release evidence, VM/container archives, artifacts, repository mirrors (§164) | Dual-parity array + snapshots; "not the only backup" (§164) | SE12 |
+| T3 isolated copy | Off-site / hosted, encrypted; or T3-SUB isolated local media (§6.3) | "independent/off-site or otherwise isolated copy" for irreplaceable data (§164) | Independent of room, UPS, NAS and host | SE12 (policy), SE17 (keys after takeover), SE11 (bootstrap custody) |
+
+**Scope rule (SE11-REQ-21).** The protection states of §6.3 govern **real D-IRR data stored on local hardware (T1)**. Data whose authoritative copy lives outside the local hardware is outside the local admission scope; its local copies are D-REB. This boundary is what makes the bootstrap non-circular: the first thing the platform needs — its own source, configuration and commissioning evidence — is never local D-IRR data.
+
+**Dataset classes (provisional default, ASM-SE11-08; SE12 is the classification owner, SE11-DEP-04):**
+
+| Class | Definition | Sub-classes and the store that enforces the creation gate and the mutation lease (§6.3, §6.3b) | Minimum protection |
+|---|---|---|---|
+| D-IRR (local) | Irreplaceable data on local hardware: cannot be re-derived from any other platform data or external authoritative copy | `KEYS` — commissioning secrets (host disk-encryption recovery key, NAS/switch/UPS-software administrative credentials, the Part B/C tokens) and, after takeover, platform key backups; primary T3 target = **T3SUB** during bootstrap. Enforcing store: **SE11's bootstrap store on the host during commissioning; SE17/SE15's store after takeover** (§6.3c). `DB` — non-synthetic platform databases; enforcing store: SE12's data store; primary target T3. `EVID` — release-evidence packages and decision logs produced by EL/SP14; enforcing store: SE12's evidence storage; primary target T3. `LREPO` — a *local* repository server, **not at baseline**; admitted like any class when adopted, and the class into which the T2 mirror is promoted on provider loss (FD-EXT-REPO) | T1 + T2 + T3 under the rules of §6.3–§6.3b |
+| D-BND | Bounded loss: re-derivable from D-IRR or from `REPO-EXT` within an accepted window | build artifacts, locally built images, validation results, telemetry history, the SE11 event log | T1 + T2; loss window accepted by SE12 |
+| D-REB | Rebuildable from definitions or external authoritative sources | caches, scratch, pulled container layers, VM system disks, **local clones and the T2 mirror of `REPO-EXT`**, **synthetic test fixtures used to verify protection mechanisms** | T1 only (the T2 mirror is itself a rebuildable copy) |
+| Outside local scope | `REPO-EXT` — source repositories, IaC, host build, configuration, the version-controlled inventory file, SE11's commissioning and acceptance evidence records: authoritative copy at an **external hosted repository service**, chosen under NT16 (SE11-DEP-09) and configured before any local hardware is commissioned (§160 keeps authoritative source in version control outside any single host) | Durability is the provider's; SE11 bounds provider loss by the T2 mirror (refreshed ≤ 1 h once `PL-T2` holds) and a repository bundle on T3-SUB at every stage gate; on provider loss the mirror is promoted to `LREPO` (§9 FD-EXT-REPO) | provider + T2 mirror + T3-SUB bundle |
+
+### 6.3 Protection states with a legal bootstrap (SE11-REQ-03, SE11-REQ-13, SE11-REQ-17, SE11-REQ-18, SE11-REQ-21, SE11-REQ-24, SE11-DEC-18, SE11-DEC-20, SE11-DEC-23, SE11-DEC-26)
+
+**Three separate things.** *Mechanism readiness* (the T3 copy path, encryption, key recovery and restore for class *c* work) is verified on **synthetic fixtures** (D-REB) — initially before any real dataset of *c* exists (SE11-AC-07b-init) and recurrently at every stage gate while real data exists (SE11-AC-07b-rec; the fixture is a synthetic dataset carried through the same mechanism path, never counted as real data and never able to advance real-data timestamps, guard P1 in §6.3a). *Dataset protection* (a real dataset of *c* has a verified copy no older than A_max) begins when the first real dataset is admitted. *Evidence intake* is how the publisher learns of copies, restores and custody: producers push records under `SE11-CONTRACT-protection-evidence@1` (§18.2 Part C); the absence of evidence is itself the fail-safe (ageing continues), and the **mutation lease** (§6.3b) makes the stores' behaviour independent of the publisher's availability.
+
+**Per-class record (held and published by the SE11 host agent; the authoritative field list).** For each local D-IRR class *c*:
+
+| Field | Meaning | Changed only by |
+|---|---|---|
+| `store(c)` | Registered producer id of the enforcing store (null until registered) | Host-build registration (§18.2 Part C); `CUSTODY_TRANSFER` |
+| `primary_target(c)` | T3 or T3SUB — the target whose verified copies define `t3_last_ok` (KEYS: T3SUB during bootstrap; DB/EVID: T3) | Registration |
+| `custody_ready(c)` | KEYS only: KB-2 complete or the takeover store ready | `CUSTODY_READY` |
+| `mech_state(c)` ∈ {UNVERIFIED, OK, SUSPECT}; `mech_ok(c)` = ts of the last passed fixture verification | Mechanism readiness | `MECH_FIXTURE_OK` / `MECH_FIXTURE_FAIL` (fixture = true only); a real `RESTORE_OK` clears SUSPECT |
+| `real_data(c)` | True once the first real dataset was created | `DATASET_CREATED` (fixture = false); never reset |
+| `t3_last_ok(c)` | Timestamp of the newest **verified real copy to the primary target** (`COPY_OK` matched by `RESTORE_OK`), or `t_create` while kind = ANCHOR | `DATASET_CREATED`; matched real `RESTORE_OK` with target = primary; never regresses |
+| `t3sub_last_ok(c)` | Timestamp of the newest verified real copy to T3SUB when T3SUB is **not** the primary target (bridging substitute) | Matched real `RESTORE_OK` with target = T3SUB |
+| `kind(c)` ∈ {ANCHOR, COPY} | COPY once a verified real copy to the primary target exists | First matched real `RESTORE_OK` to the primary target |
+| `rfail(c)` | Count of **consecutive** failed restore verifications of real copies to the primary target | Real `RESTORE_FAIL` (+1); real `RESTORE_OK` (reset to 0) |
+| `age(c)` | now − `t3_last_ok(c)` | Tick |
+| `A_max`, `G` | 24 h, 24 h (ASM-SE11-10 until SE12 binds them, SE11-DEP-04); a test class may carry shorter values (§14) | Registration |
+| `state(c)`, `admit(c)` ∈ {ALLOW, DENY}, `lease(c)` = {`mutate` ∈ {ALLOW, FREEZE}, `until`, `basis`} | Derived by §6.3a and §6.3b | Derivation only |
+
+**States (summary; the transition table of §6.3a governs):**
+
+| State of class c | Definition (P-order of §6.3a) | `admit(c)` | `lease(c).mutate` (ceiling; the store enforces `until − U`, §6.3b) | Mandatory actions / notes |
+|---|---|---|---|---|
+| MECH-UNVERIFIED | No real data and (mech_state ≠ OK, or `store(c)` null, or custody not ready for KEYS) | DENY — only synthetic fixtures (D-REB) may exist | n/a (no real data) | Commission the T3 mechanism; register the store; run SE11-AC-07b-init on a fixture |
+| ARMED | No real data; mech_state = OK within the current stage; `store(c)` registered; custody ready (KEYS) | ALLOW → first real dataset enters PROTECTED(ANCHOR) at `t_create` and the store triggers the initial copy immediately | n/a | Re-verify the fixture at every stage gate; a fixture failure returns the class to MECH-UNVERIFIED |
+| PROTECTED | Real data; `rfail` < 2; mech_state ≠ SUSPECT or `rfail` = 0 **and** `age(c)` ≤ A_max. kind = ANCHOR until the first verified real copy to the primary target | ALLOW only if `rfail` = 0 and mech_state = OK; DENY otherwise (a single restore failure or a suspect mechanism blocks new datasets until a real `RESTORE_OK`) | ALLOW with `until` = max(`t3_last_ok` + A_max + G, `t3sub_last_ok` + A_max) | Copy at interval ≤ A_max; `SIG-PROTECTION-STATE` carries state, lease and record |
+| DEGRADED-IN-BUDGET | Real data; `rfail` < 2; A_max < `age(c)` ≤ A_max + G | DENY | ALLOW with the same `until` formula (it lies in the future by definition of this state) | Level change published ≤ 60 s; copy retried every 1 h; SE20 prepares a T3-SUB copy so that a verified substitute exists before expiry; exposure window logged |
+| EXPIRED | Real data and (`age(c)` > A_max + G **or** `rfail` ≥ 2 — mechanism broken, precedence P2) | DENY | `until` = `t3sub_last_ok` + A_max if a **verified** T3-SUB substitute copy exists and that instant is in the future; otherwise FREEZE (`until` = null). The primary-target term is dropped when `rfail` ≥ 2 | SE20 incident; SE12 decides whether to bridge via T3-SUB or hold the freeze; every hour in EXPIRED is logged against the stage's exposure budget |
+
+**SE11-REQ-03 (state rule).** T0/T1 is never the sole copy of D-IRR or D-BND data beyond the declared windows: every T1 dataset has a T2 copy within the snapshot interval of SE11-NFR-05; every real local D-IRR class is at every moment in exactly one of the states above, and its exposure to total local loss is **bounded** by the state rule: zero beyond `age(c)` when kind = COPY; the whole class when kind = ANCHOR, which can last at most A_max (then DEGRADED) + G (then EXPIRED, freeze or verified T3-SUB bridge). The ANCHOR window is a declared, bounded exposure, not an exception to this requirement. **Mutation exposure is bounded by the lease (§6.3b): no registered store mutates real data of c after `lease.until − U`, whatever the publisher's state.**
+
+**Platform-level derived state (published as `SIG-PL-STATE`; "real D-IRR" means local, per SE11-REQ-21):** `PL-0` = before SE11-AC-07a (only D-REB and synthetic data on local T1; no verified T2); `PL-T2` = SE11-AC-07a passed and no real local D-IRR data exists (classes MECH-UNVERIFIED or ARMED only); `PL-T3-PENDING` = every class with real data is PROTECTED and at least one is ANCHOR; `PL-T3` = every class with real data is PROTECTED with kind COPY; `PL-DEG` = at least one class DEGRADED-IN-BUDGET and none EXPIRED; `PL-EXP` = at least one class EXPIRED.
+
+**Invariants (checked at every step of SE11-AC-07d and by SE11-AC-10).** (I1) A real local D-IRR dataset of class c exists only if c was ARMED at the moment of its creation or c already held real data in PROTECTED with `admit` = ALLOW (creation gate). (I2) In `PL-0` and `PL-T2` no real local D-IRR data exists. (I3) In `PL-DEG`/`PL-EXP` real D-IRR data exists and is exposed to FD-STORAGE/FD-ROOM for at most `age(c)`; the exposure is bounded by A_max + G plus the T3-SUB age. (I4) SE11-AC-10 passes only in `PL-T2` or `PL-T3` (never `PL-T3-PENDING`, `PL-DEG`, `PL-EXP`). (I5) T3-dependent recovery (§6.6) is valid for class c only from a COPY; while kind = ANCHOR a loss of T1 and T2 loses the class entirely, and by the state rule that class is at most A_max + G old. (I6) No real local D-IRR data exists in a class whose enforcing store has no registered producer **with a passed lease-conformance record** — a class whose owner's store does not yet exist, or has not proven lease enforcement, is MECH-UNVERIFIED by definition, so the absence of an owner document can never produce unprotected or unboundedly mutable data. (I7) No network-reachable Part B/C endpoint exists without token authentication, and no token exists that is not a `KEYS` secret with verified custody (bootstrap window rule, §6.3c).
+
+**Class-specific activation.**
+- `REPO-EXT` (outside scope): configured in the host build **before** any local hardware is commissioned; the first commit is the host build itself; commissioning evidence, the inventory file and every SE11 acceptance record are committed there and inherit the provider's durability; the T2 mirror and the T3-SUB bundle bound provider loss (§6.2). Nothing here creates local D-IRR data.
+- `KEYS`: bootstrap custody and bootstrap authority per §6.3c (KB-1 … KB-5 with the bootstrap channel).
+- `DB`, `EVID`: fixture = a synthetic dataset of the class carried through the owner's backup path to T3 and restored (SE11-AC-07b-init); real data admitted from ARMED only, by the owner's store, which must have registered with its SE11-AC-07e lease-conformance record. Until SE12's store exists and registers, the class is MECH-UNVERIFIED and holds no real data (I6).
+- `LREPO`: not at baseline; on adoption, fixture = a test repository; on FD-EXT-REPO promotion, the T2 mirror enters PROTECTED(ANCHOR) with `t3_last_ok := last mirror refresh` and must receive a verified T3 copy (T3-SUB bundle or a new external remote) within A_max.
+
+**Outage tolerance.** The tolerance of class c to loss of the T3 path is its **remaining copy-age budget**, `A_max − age(c)` at the moment the outage starts (then G of degraded operation), not a fixed 24 h; mutation continues until `lease.until − U` and no longer.
+
+**Restoration.** T3 path restored → a full copy of class c completes (`COPY_OK`) → restore verification on another machine passes (`RESTORE_OK`, same `copy_id`) → `t3_last_ok(c)` updated, kind COPY, `rfail` := 0, mech_state := OK → PROTECTED; a fresh lease is published within 60 s and the store resumes mutation only on that fresh lease (§6.3b).
+
+**Enforcement and ownership (SE11-REQ-18, SE11-REQ-24, contract-bound).** SE11 publishes the per-class record, state, `admit(c)` and `lease(c)` under `SE11-CONTRACT-hardware-signals@1`, and accepts evidence under `SE11-CONTRACT-protection-evidence@1` (§18.2). The gates are enforced by the store that holds the class, consuming the published levels and applying the lease rule locally: SE11's bootstrap store for `KEYS` during commissioning; SE12's stores for `DB` and `EVID`; SE17/SE15's store for `KEYS` after takeover. SE11 has no hardware-level backstop inside another owner's store and does not claim one; what it guarantees is that **no class can hold real data unless its store has registered as a producer, has proven lease enforcement (SE11-AC-07e record in its registration) and consumes the levels** (I6, SE11-REQ-23 validator, SE11-AC-07d negative checks). The end-to-end bounded-exposure guarantee for class c is therefore stated as: *conditional on store(c)'s registration carrying a passed SE11-AC-07e record for the store build in use* — and because registration without that record is refused, the condition is always either satisfied or the class holds no real data. T3-SUB is an encrypted copy to removable media or a second independent location kept outside the room (§164 "otherwise isolated copy"), restore-verified on a second machine; it is the primary T3 for KEYS during bootstrap and a bridging substitute for DB/EVID.
+
+**Verification.** SE11-AC-07b-init, SE11-AC-07b-rec, SE11-AC-07c (expiry drill), SE11-AC-07d (from-empty-platform trace, §14), SE11-AC-07e (lease enforcement under publisher outage), SE11-AC-07f (transition-table cases), SE11-AC-10 (I4).
+
+### 6.3a Authoritative transition table (SE11-DEC-26; §14 and §18.2 Part C reference this table and define nothing contrary)
+
+**Evaluation order on every record and on every tick (precedence).**
+
+| Step | Rule |
+|---|---|
+| **P1 — scope and validity guards** (a record failing a guard changes nothing; the outcome is logged and, where stated, rejected to the producer) | (a) `producer_id` not registered, or `class` not owned by it → reject 403. (b) `fixture = true` records may change only `mech_state`/`mech_ok`; they **never** touch `real_data`, `t3_last_ok`, `t3sub_last_ok`, `kind`, `rfail` or the lease. (c) Duplicate (same `producer_id`, `copy_id`, `event`) → ignored (idempotent). (d) `RESTORE_OK`/`RESTORE_FAIL` whose `copy_id` has no prior `COPY_OK` → held for 10 min awaiting the `COPY_OK`, then rejected and logged (out-of-order tolerance). (e) A record with `ts` > publisher now + U → rejected (clock). (f) Timestamps never regress: a verified copy older than the current `t3_last_ok`/`t3sub_last_ok` leaves it unchanged. (g) `RESTORE_OK` for a real copy is valid only if `restored_on` ≠ the host that produced the copy (T3SUB: a second machine); otherwise treated as `RESTORE_FAIL` |
+| **P2 — mechanism broken** | If `real_data` and `rfail` ≥ 2 → state **EXPIRED** regardless of age; lease primary term dropped (§6.3b) |
+| **P3 — age** | If `real_data` and `rfail` < 2: `age` ≤ A_max → PROTECTED; ≤ A_max + G → DEGRADED-IN-BUDGET; else EXPIRED |
+| **P4 — no real data** | mech_state = OK and `store` registered (with AC-07e record) and custody ready → ARMED; else MECH-UNVERIFIED |
+| **Admit** | ALLOW iff state ∈ {ARMED} or (state = PROTECTED and `rfail` = 0 and mech_state = OK); DENY otherwise |
+| **Lease** | Per §6.3b from the record after P1–P4 |
+
+**Transitions (event × current situation → record change → resulting state by P2–P4).**
+
+| Event (Part C) | `fixture` | Situation | Record change | Result |
+|---|---|---|---|---|
+| `MECH_FIXTURE_OK` | true | any | `mech_state` := OK; `mech_ok` := ts | No real data → ARMED if store + custody ready; real data → state by age (a fixture pass **never** changes `t3_last_ok`, so an EXPIRED class stays EXPIRED and its lease is unchanged) |
+| `MECH_FIXTURE_FAIL` | true | no real data | `mech_state` := UNVERIFIED | MECH-UNVERIFIED |
+| `MECH_FIXTURE_FAIL` | true | real data | `mech_state` := SUSPECT | State by age unchanged; `admit` DENY until a real `RESTORE_OK` or a later `MECH_FIXTURE_OK`; lease unchanged (ageing bounds it) |
+| `MECH_FIXTURE_*` | false | any | — | Rejected (a mechanism record must be a fixture) |
+| `CUSTODY_READY` | — | KEYS | `custody_ready` := true | ARMED if the other ARMED conditions hold |
+| `CUSTODY_TRANSFER` | — | KEYS, both producers registered | `store(KEYS)` := new producer; old producer stays registered until its retirement is committed in the host build | Unchanged state |
+| `DATASET_CREATED` | false | ARMED | `real_data` := true; `t3_last_ok` := ts; `kind` := ANCHOR | PROTECTED(ANCHOR) |
+| `DATASET_CREATED` | false | PROTECTED, `admit` = ALLOW | — (further datasets inherit the class record) | Unchanged |
+| `DATASET_CREATED` | false | any state with `admit` = DENY | — | Rejected 409 and logged as a **store-enforcement violation** (the store must not have created it; SE20 incident; the producer's registration is suspended → class `admit` DENY until re-registered with a fresh SE11-AC-07e record) |
+| `COPY_OK` | false | real data | Copy recorded as **pending** (`copy_id`, ts, target); **no timestamp advances** | Unchanged — ageing continues until the matched `RESTORE_OK` |
+| `COPY_FAIL` | false | real data | Logged | Unchanged (ageing continues) |
+| `RESTORE_OK` | false | matched pending copy, target = `primary_target` | `t3_last_ok` := copy ts (if newer); `kind` := COPY; `rfail` := 0; `mech_state` := OK | State by age; fresh lease |
+| `RESTORE_OK` | false | matched pending copy, target = T3SUB ≠ primary | `t3sub_last_ok` := copy ts (if newer) | State unchanged (substitute copies do not change the primary age); lease recomputed (§6.3b) — in EXPIRED this is the only way to re-authorize mutation |
+| `RESTORE_FAIL` | false | matched pending copy, target = primary | `rfail` += 1; the copy is discarded (never counted); `admit` DENY; store must start a new copy immediately | `rfail` = 1 → state by age; `rfail` ≥ 2 → EXPIRED (P2) |
+| `RESTORE_FAIL` | false | matched pending copy, target = T3SUB ≠ primary | Substitute copy discarded; logged | Unchanged |
+| Tick (every ≤ 60 s) | — | real data | `age` recomputed | P2/P3 |
+| Producer registration (host build) | — | class c | `store(c)` := id only if the registration carries a passed SE11-AC-07e record id for the store build; otherwise the validator refuses the commit (SE11-REQ-23) | P4 |
+
+**Recovery from a failed restore.** `rfail` = 1: the store starts a new copy at once; `admit` stays DENY and the lease is unchanged (bounded by the previous verified copy); a matched `RESTORE_OK` resets everything. `rfail` ≥ 2: the mechanism is treated as broken — EXPIRED, SE20 incident, lease primary term dropped; return to PROTECTED only by a new `COPY_OK` + matched `RESTORE_OK` to the primary target; meanwhile mutation may continue only on a **verified** T3-SUB substitute copy (`until` = `t3sub_last_ok` + A_max).
+
+### 6.3b Mutation lease — consumer-enforced bounded mutation authorization (SE11-DEC-23, SE11-ADR-16, SE11-REQ-24)
+
+**Why.** `mutate` published as a level could be acted on indefinitely by a store that lost sight of the publisher. The lease makes the authorization **self-expiring in the store** so that the bounded-exposure claims of §6.3 hold whether the publisher is up, down, STALE, restarting or rebuilt.
+
+**Publisher side (derivation, carried in every `SIG-PROTECTION-STATE` level, `HEARTBEAT` and `/levels` snapshot):**
+
+| Field | Value |
+|---|---|
+| `lease.until` | T_primary = `t3_last_ok` + A_max + G if `rfail` < 2, else −∞; T_sub = `t3sub_last_ok` + A_max if a verified substitute exists, else −∞ (for KEYS, whose primary target is T3SUB, T_sub is not separately used); **`until` = max(T_primary, T_sub)**; `null` if both are −∞ or no real data |
+| `lease.mutate` | ALLOW iff `until` is non-null and publisher now < `until`; FREEZE otherwise |
+| `lease.basis` | COPY / ANCHOR / T3SUB / none |
+| `lease.pub_now` | Publisher's UTC clock at issue |
+| `lease.inc`, `lease.seq` | Incarnation and sequence of the issuing event (§18.2 Part B); informational for the store, used in SE11-AC-07e logs |
+
+Invariant: `until` is a pure function of verified evidence timestamps and the class parameters; it is never extended by heartbeats, time, or anything other than a new verified copy.
+
+**Store side (the rule every registered store implements; SE11-REQ-24):**
+
+| # | Rule |
+|---|---|
+| L1 Persist | The store persists the latest lease it accepted for each class (`lease_c`) together with its own clock at receipt (`t_recv`) and a monotonic high-water mark `hw_time` = max clock value it has ever observed |
+| L2 Accept | A lease is accepted only if `|t_recv − lease.pub_now| ≤ U` (U = **300 s**, ASM-SE11-18). A lease failing this check is rejected, logged, and the store treats the class as FREEZE until a lease passes (skew alert to SE20) |
+| L3 Mutate | A mutation of real data of class c is permitted **iff** `lease_c.mutate` = ALLOW **and** store clock now < `lease_c.until − U`. Nothing else is consulted: STALE, UNKNOWN, publisher unreachable, host agent restarted — none of these extend or shorten the deadline |
+| L4 Startup / restart | On start the store loads `lease_c`; if it exists, passes L5, and now < `until − U`, mutation continues under it; otherwise the class is FREEZE until a fresh lease from the current publisher incarnation is accepted |
+| L5 Clock rollback | If store clock now < `hw_time − U`, the store FREEZEs every class and alerts; it resumes only after accepting a fresh lease (whose `pub_now` re-establishes the comparison) and only under that fresh lease |
+| L6 Recovery | A class in FREEZE resumes mutation **only** on a fresh accepted lease with `mutate` = ALLOW; never by the passage of time, a clock change, or a stale persisted lease. Because the publisher carries leases in every heartbeat, recovery after an outage takes ≤ H + P = 120 s once the publisher is back and the state permits |
+| L7 Creation | `admit` is not leased: a store creates a real dataset only on a current (bootstrapped, non-STALE) `admit` = ALLOW from the publisher (SE11-REQ-22) |
+| L8 Evidence | The store build in use has a passed SE11-AC-07e record (publisher-outage expiry test) referenced in its producer registration; the validator refuses registration without it (SE11-REQ-23) |
+
+**Bounded exposure, stated.** For any registered store and any class with real data, the last possible mutation instant is `max(t3_last_ok + A_max + G, t3sub_last_ok + A_max) − U` by the store's own clock (bounded from the publisher's clock by L2/L5 to within U); after that instant the store refuses writes until a new verified copy produces a fresh lease. This holds with the publisher down for any duration.
+
+**Clock uncertainty.** U = 300 s is both the acceptance tolerance (L2) and the safety margin (L3/L5). Stores and the host agent synchronise to the same time source on `seg.mgmt`; a drift beyond U is treated as a fault, not tolerated (SE11-RISK-16).
+
+**Interaction with ANCHOR.** For a class at ANCHOR, `until` = `t_create` + A_max + G: a newly admitted class whose first copy never verifies is frozen in every store 48 h − U after creation, which is the §6.3 exposure bound.
+
+### 6.3c KEYS bootstrap custody and the bootstrap authority (SE11-DEC-18, SE11-DEC-24, SE11-ADR-14, SE11-ADR-17, SE11-REQ-25)
+
+**The circularity to avoid.** Part C requires a per-producer bearer token and Part B a read token; both are `KEYS` secrets; `KEYS` cannot be ARMED before fixture evidence is submitted; and no secret may exist before `admit(KEYS)` = ALLOW. A network-token design therefore cannot reach its first legal secret. The bootstrap authority below replaces network tokens with an OS-authenticated local channel during a bounded window and then revokes it.
+
+**Bootstrap window (`bootstrap_window = true` in the host build, committed to `REPO-EXT`).**
+
+| Property | Specification |
+|---|---|
+| Who | The host agent is one service under a dedicated service account `svc-se11-agent`; the publisher (Part B), the intake (Part C) and the **bootstrap store** are components of that service |
+| Channel | Part B and Part C are served **only** on a local channel on M2_1 (named pipe / Unix domain socket) with an OS ACL that admits `svc-se11-agent` only; **no network listener exists** while the window is open (I7) |
+| Authentication | OS identity of the caller (ACL); no bearer token; every call logged with caller identity |
+| Registration | The bootstrap store's producer registration is static in the host build: `producer_id = se11-bootstrap`, class KEYS, `primary_target = T3SUB`, `auth = local-channel`, `lease_conformance = <SE11-AC-07e record for the host-agent build>` (the test is run on the host-agent build itself, before the window opens, with a test class — it needs no network tokens) |
+| Scope | Only `KEYS` can be ARMED or admitted during the window (the validator refuses any other producer registration while `bootstrap_window = true`) |
+| Closing condition | `KEYS` is PROTECTED with kind COPY **and** the initial token set has been created, written to both T3-SUB media and read back (KB-3b) |
+| Transition | Host build commit flips `bootstrap_window = false`; the host agent restarts (new incarnation, §18.2): network endpoints on `seg.mgmt` with token authentication are enabled; the local channel is **removed** (socket deleted; code path disabled by the flag); the bootstrap store's registration becomes `auth = token TOK-C-boot`. The flag flip is the **revocation** of the bootstrap authority |
+| Validator (SE11-REQ-23) | Refuses: a host build with `bootstrap_window = true` while the inventory records any token id or `KEYS` kind = COPY; a producer registration with `auth = local-channel` while the window is closed; any network endpoint configuration while the window is open |
+
+**Custody procedure KB (owned by SE11 so that commissioning needs no absent owner):**
+
+| Step | Action | Channel / credential used | Record and state |
+|---|---|---|---|
+| KB-1 | Prepare two T3-SUB media (removable, encrypted under an operator-held passphrase never stored on the platform, ASM-SE11-17); store them outside the room | none | — |
+| KB-2 | Fixture verification: a test secret written to both media, read back on a second machine, checksum-compared; `MECH_FIXTURE_OK` (fixture = true) and `CUSTODY_READY` submitted by the bootstrap store | local channel (OS ACL) | `mech_state(KEYS)` = OK, custody ready, store registered → **ARMED** |
+| KB-3a | First real secret: the bootstrap store reads `admit(KEYS)` = ALLOW (local channel), generates the host disk-encryption recovery key, writes it to both media, reads back on the second machine, submits `DATASET_CREATED` then `COPY_OK target=T3SUB` + `RESTORE_OK` (same `copy_id`, `restored_on` = second machine) | local channel | PROTECTED(ANCHOR) → PROTECTED(COPY); disk encryption is enabled only after this |
+| KB-3b | Initial token set, each generated → both media → read-back → `COPY_OK`/`RESTORE_OK` before use: `TOK-B-read` (consumer read token for Part B), `TOK-C-boot` (the bootstrap store's own Part C token), `TOK-B-admin` (endpoint administration). No token is used for anything until its custody evidence is accepted | local channel | KEYS COPY (n secrets); closing condition met |
+| KB-3c | **Transition**: commit `bootstrap_window = false`; host agent restart; from here every Part B/C call is a network call on `seg.mgmt` with a token | token auth from this step on; local channel gone | New incarnation; INIT re-derives KEYS = PROTECTED(COPY) from persisted evidence; leases re-issued |
+| KB-3d | NAS, switch and UPS-software default credentials rotated; each new credential enters KEYS through the same create → media → read-back → evidence path | `TOK-C-boot` over the network endpoint | KEYS COPY |
+| KB-4 | Recurring: SE11-AC-07b-rec at every stage gate with a fresh test secret (fixture = true; cannot advance real timestamps, §6.3a P1b) | `TOK-C-boot` | `mech_ok` refreshed |
+| KB-5 | Takeover: SE17/SE15 register their store as a second producer for KEYS (with its own SE11-AC-07e record and token, issued through KB-3d's path), import the secrets, copy them to their T3 path with `COPY_OK`/`RESTORE_OK`, submit `CUSTODY_TRANSFER`; only then is `se11-bootstrap` retired by a host-build commit | `TOK-C-boot` (old), new store token | KEYS stays PROTECTED throughout; `primary_target` may change to T3 at transfer |
+
+**Unauthorized bootstrap attempts (tested in SE11-AC-07d step 9):** during the window, a network call to Part B/C fails (no listener); a local call from any OS identity other than `svc-se11-agent` is refused by the ACL and logged; after the window, a call on the local channel fails (socket absent) and a host build attempting to re-open the window with existing tokens is refused by the validator. Re-opening the window is possible only on a **rebuilt** host with an empty inventory (no token ids, KEYS re-derived as MECH-UNVERIFIED), which is the FD-NVME-M2_1 / FD-HOST rebuild path: the secrets still exist on the T3-SUB media; the rebuilt agent imports them through KB-3a/3b again with new tokens.
+
+### 6.4 Bandwidth / IOPS / latency assumptions (device-class figures from the BOM; measured values replace them in SE11-AC-04)
+
+| Path | Nominal from BOM | Engineering assumption used for design |
+|---|---|---|
+| M2_1, M2_2, M2_4 (Gen4 x4 devices) | up to 7,300 / 6,300 MB/s (§227.5–§227.6) | Sustained mixed workload 2–4 GB/s per device; sub-millisecond latency; NVMe is not the first bottleneck; D2, S2 and L2 measured for §6.1a |
+| M2_3 (Gen4 x2 slot shared with PCI_E3) | device 7,300 MB/s; slot ≈ half of x4 | ≈ 3–3.5 GB/s ceiling; acceptable for scratch, and for Validation under Mapping-V only if SE11-AC-12b passes on it; verified in SE11-AC-02/04 |
+| Host ↔ NAS over 10 GbE (L1) | 10 Gb/s ≈ 1.1–1.2 GB/s wire (Fallback C: ≤ ~0.98 GB/s) | 0.7–1.0 GB/s sustained for backup/artifact transfer; a 4–6 drive RAID 6 CMR array delivers on the order of 0.5–1.0 GB/s sequential and far lower random IOPS — the NAS is never used for random-IO workloads (§164) |
+| Endurance | 600 TBW (1 TB), 2,400 TBW (4 TB) (§227.5–§227.6) | Scratch exhausts TBW first; when scratch is on M2_2, that device's consumption rises; TBW telemetry mandatory (§10.3); replacement by specification class (§11.4) |
+
+### 6.5 RAID / replication boundaries
+
+- Host NVMe: no RAID. Independence of M2_2 and M2_4 (and M2_3 under Mapping-V) is the only host-level isolation; redundancy is by replication to T2 (SE11-ADR-05). Rationale: host mirroring would double NVMe cost for a tier whose durability requirement is met by snapshot + replication and would not protect against host loss, the dominant failure domain (§9).
+- NAS: RAID 6 at any drive count ≥ 4 (dual parity is mandatory at 20 TB per drive because the rebuild window — planning assumption 1–3 days under concurrent load, ASM-SE11-04 — must tolerate a second loss). Snapshots guard against logical corruption; T3 guards against array, enclosure, power or site loss (§164).
+- Replication is one-way T1 → T2 → T3; T2 never serves as a live datastore for VMs or databases.
+- The BOM's NVMe is a client-class device; power-loss protection of in-flight writes is **not asserted** (§11.2). Crash consistency therefore relies on filesystem journaling in every VM, database write-ahead logging with synchronous commit (SE12), and NAS copy-on-write; all are verified by the abrupt-loss drill SE11-AC-13 (SE11-NFR-07).
+
+### 6.6 Recovery expectations (hardware-capable targets stated to SE12; SE12 sets the binding RPO/RTO)
+
+**T2-only recoveries (no T3 dependency):**
+
+| Scenario | Hardware-capable target | Dependency |
+|---|---|---|
+| M2_4 failure (Core + Data VMs, platform data) | Full platform outage; restore both VMs and database from the last T2 snapshot/backup; data loss ≤ snapshot interval (≤ 1 h, SE11-NFR-05); RTO ≤ 4 h per VM | Spare NVMe of the §11.4 class; SE12 schedule |
+| M2_2 failure (Build VM, artifacts; Validation too under Mapping-D; scratch too when on M2_2) | Build/validation outage; runtime continues; restore from T2 archives or rebuild from definitions; D-BND loss within SE12's accepted window | Spare NVMe |
+| M2_1 failure (host OS, host agent store) | All VMs stop until the host OS is rebuilt from `REPO-EXT` onto a replacement device; VM disks on M2_2/M2_4 remain intact; the host agent restarts as a **new incarnation** (§18.2) and re-derives protection levels from the evidence held in `REPO-EXT`/T2 (fail-safe: unknown → `admit` DENY and lease FREEZE until evidence is re-ingested); stores continue under their persisted leases until `until − U` (§6.3b L4) and resume on fresh leases; KEYS tokens re-imported from T3-SUB through the rebuild path of §6.3c | Spare NVMe; host build definition in `REPO-EXT`; T3-SUB media |
+| M2_3 failure | Mapping-D: rebuild caches, no data loss, interim scratch on M2_2 if no spare; Mapping-V: Validation outage, restore from T2/definitions | Spare NVMe or fallback mapping |
+| Single NAS drive failure | No data loss; degraded; rebuild window ASM-SE11-04; replacement drive of equivalent class | Free bays allow a hot spare as an SE12 decision |
+| Two concurrent NAS drive failures | No data loss (RAID 6) | — |
+| Host loss (board/CPU/PSU) with intact NVMe | Move the NVMe devices to a replacement host of the §11.4 class or restore VMs to a hosted equivalent (§160, §168) | Hardware-independent definitions (SE11-REQ-05) |
+
+**T3-dependent recoveries (valid per class only from a COPY, §6.3 I5; loss window = `age(c)` at the moment of loss; a class still at ANCHOR is lost entirely, bounded by A_max + G of existence; in `PL-T2` no real local D-IRR data exists, so the residual is the loss of D-BND/D-REB only):**
+
+| Scenario | Hardware-capable target | Dependency |
+|---|---|---|
+| Third NAS drive failure before rebuild completes (array loss) | Restore each D-IRR class from T3 with loss ≤ `age(c)`; D-BND re-derived; `REPO-EXT` mirror re-cloned | Verified T3 copy per class |
+| NAS enclosure loss | T1 continues without a local backup target (degraded, time-boxed by SE12); D-IRR protected by T3 until the NAS is replaced; classes move to DEGRADED when their T2→T3 pipeline depends on the NAS | T3 |
+| Host loss with NVMe loss, room/site loss (FD-ROOM) | Rebuild on replacement or hosted infrastructure from `REPO-EXT` (definitions), T3 (D-IRR, loss ≤ `age(c)`) and the KEYS T3-SUB media; D-BND re-derived | T3, T3-SUB, hosted fallback |
+| External repository provider loss (FD-EXT-REPO) | Promote the T2 mirror to `LREPO` (PROTECTED(ANCHOR) at the last refresh time); establish a new remote or T3-SUB bundle within A_max | T2 mirror; stage-gate bundle |
+
+### 6.7 Capacity headroom and NAS capacity candidates (SE11-DEC-06)
+
+| Tier | Candidate / installed | Headroom rule | Expansion path |
+|---|---|---|---|
+| T1 (M2_2 + M2_4) | 2 × 4 TB (fixed by B6 class) | Alert 70 %, architecture review 85 % (REV-STORAGE-HOT) | No free M.2 slots: larger devices of the same class (scale-up) or artifact store fronted by T2; SATA ×4 for cold tiers only |
+| T2 NAS — **N-A** (default) | 4 × 20 TB RAID 6 → 40 TB nominal, ≈ 36.4 TiB usable (derived with the seed's 80 TB → 72.8 TiB ratio, ASM-SE11-04); 4 bays free | Alert 70 %, review 80 % | Add same-class drives to free bays on TRG-NAS-CAP (online array expansion support by the NAS OS not established — FC-08) |
+| T2 NAS — **N-B** | 6 × 20 TB RAID 6 → ≈ 72.8 TiB usable (seed reference); 2 bays free | as above | 2 free bays |
+| T2/T3 — **N-C** | Hosted object storage for T2 and/or T3 (NAS deferred or absent) | provider quota | Hosted elasticity; acceptable per §238; economics unknown (SE11-DEP-08) |
+| T3 | Must hold at least the local D-IRR set per class; T3-SUB media sized to the same set plus the repository bundle | n/a | Provider/medium per SE12 and NT16 (SE11-DEP-04/09) |
+
+**Decision rule (SE11-DEC-06).** Let V be SE12's modelled retention volume for the first two stages (D-IRR + D-BND copies at the retention policy, including snapshot overhead and the `REPO-EXT` mirror). Choose N-A if V ≤ 22 TiB (≈ 60 % of N-A usable); N-B if 22 TiB < V ≤ 44 TiB; above 44 TiB the answer is REV-STORAGE (architecture revision), not simply more drives; N-C if gate G-LOCAL fails for the NAS. If the NAS must be commissioned before the model exists, **N-A** is installed (H.1/H.3) and the choice is recorded as SE11-DEC-06a in the sizing document. **Six drives are never adopted on the strength of this document alone.**
+
