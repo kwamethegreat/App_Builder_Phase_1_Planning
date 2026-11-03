@@ -184,3 +184,134 @@ Assumptions: ASM-SE11-03 — no measured workload exists at Stage 0; the floors 
 ### 5.4 Accelerator (deferred) preconditions
 
 The GPU (B11) stays DEFER / OPTIONAL until all of the following hold: (a) a measured trigger from §12.2 (local-inference latency/privacy/cost case or GPU-required application testing, §176); (b) SE11-AC-02 confirms PCI_E1 x16 availability, 241 mm single-slot clearance and the 12V-2x6 cable; (c) SE11-AC-06 confirms the measured full-load system draw plus 145 W stays ≤ 80 % of the 750 W PSU rating; (d) SE11-AC-03 confirms a supported path to expose the GPU to a Linux VM on client Hyper-V (device assignment or partitioning) — if no supported path exists, the fallback is a host-level local-model service exposed to VMs over the internal virtual network, recorded as an SE11-DEC entry; (e) local models are registered under the same AI-dependency governance as external models (§177). Any accelerator above 145 W, a second accelerator, or a dual-slot card is ESCALATE ARCHITECTURE IMPACT because it exceeds the PSU, slot and thermal envelope of the reference configuration (SE11-ADR-04).
+
+## 6. Storage architecture (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05)
+
+### 6.1 Tiers and roles
+
+| Tier | Device(s) | Role (seed) | Durability boundary | Owner of policy |
+|---|---|---|---|---|
+| T0 system | M2_1 SN850X 1 TB | Windows + WSL2 (§227.5) | Rebuildable from version-controlled configuration; no unique data | SE20 (host build), SE17 (encryption) |
+| T0 scratch | M2_3 SN850X 1 TB (Gen4 x2 link) | Build cache / scratch (§227.5) | Disposable; loss costs rebuild time only | SE11 |
+| T1 hot VM/artifact | M2_2 SN850X 4 TB | VM disks + active artifact store (§227.6) | Independent volume; snapshot + nightly replication to T2 | SE12 (artifact retention), EL (VM definitions) |
+| T1 hot data | M2_4 SN850X 4 TB | Platform data, databases, container layers (§227.6, §163) | Independent volume; database-consistent backups to T2 | SE12 |
+| T2 durable | NAS RAID 6, 6×20 TB, ~72.8 TiB usable | Backups, snapshots, release evidence, VM/container archives, historical artifacts, repositories/mirrors, platform/application backups (§164) | Dual-parity array + Btrfs snapshots; not a substitute for NVMe latency (§164) | SE12 |
+| T3 isolated copy | Off-site / immutable copy, provider or medium selected by SE12 | "Truly irreplaceable data should have an independent/off-site or otherwise isolated copy as the program matures" (§164) | Independent failure domain from the room, UPS, NAS and host | SE12 (policy), SE17 (encryption/keys) |
+
+SE11-REQ-03: T0/T1 NVMe is never the sole copy of release evidence, repositories, platform databases or VM definitions (§163, §177 acceptance list); every T1 dataset has a T2 copy and every irreplaceable dataset has a T3 copy.
+
+### 6.2 Bandwidth / IOPS / latency assumptions (device class figures from the BOM; measured values replace them in SE11-AC-04)
+
+| Path | Nominal from BOM | Engineering assumption used for design |
+|---|---|---|
+| M2_1, M2_2, M2_4 (Gen4 x4 devices) | up to 7,300 / 6,300 MB/s read/write (§227.5–§227.6) | Sustained mixed workload 2–4 GB/s per device; sub-millisecond latency; sufficient that NVMe is not the first bottleneck |
+| M2_3 (Gen4 x2 slot, shared with PCI_E3) | device 7,300 MB/s; slot ≈ half of x4 | ≈ 3–3.5 GB/s ceiling; acceptable for build cache; verified in SE11-AC-02/04 |
+| Host ↔ NAS over 10GbE | 10 Gb/s link ≈ 1.1–1.2 GB/s wire | 0.7–1.0 GB/s sustained for backup/artifact transfer; 6-drive RAID 6 CMR array is expected to deliver on the order of 0.5–1.0 GB/s sequential and far lower random IOPS — the NAS is therefore never used for random-IO workloads (§164) |
+| Endurance | 600 TBW (1 TB), 2,400 TBW (4 TB) (§227.5–§227.6) | Scratch drive (M2_3) is the first to exhaust TBW; TBW consumption telemetry is mandatory (§10.3); replacement by specification class in §11 |
+
+### 6.3 RAID / replication boundaries
+
+- Host NVMe: no RAID. Independence of M2_2 and M2_4 is the only host-level isolation; redundancy is by replication to T2, not by mirroring (SE11-ADR-05). Rationale: host-side mirroring would double NVMe cost for a tier whose durability requirement is met by snapshot + replication, and would not protect against host loss, which is the dominant failure domain (§9).
+- NAS: RAID 6 across six drives, two bays free (§228.3). RAID 6 (not RAID 5) is mandatory at 20 TB drive size because a rebuild at this capacity runs for an extended window (planning assumption 1–3 days under concurrent load, ASM-SE11-04) during which a second drive loss must still be tolerated. "RAID provides drive-failure resilience but is not the only backup" (§164): Btrfs snapshots guard against logical corruption; T3 guards against array, enclosure, power or site loss.
+- Replication direction is one-way T1 → T2 → T3; T2 never serves as a live datastore for VMs or databases (prevents the NAS becoming a hot-path single point of failure).
+
+### 6.4 Recovery expectations (hardware-capable targets stated to SE12; SE12 sets the binding RPO/RTO)
+
+| Scenario | Hardware-capable target | Dependency |
+|---|---|---|
+| Single NVMe failure (T1) | Restore VM/data from last T2 snapshot/backup within hours; data loss bounded by replication interval (hardware supports hourly snapshots and nightly full replication) | Spare NVMe of equivalent class (§11); SE12 schedule |
+| Single NAS drive failure | No data loss; array degraded; rebuild window ASM-SE11-04; replacement drive of equivalent class inserted into a free bay or the failed bay | 2 free bays allow hot-spare adoption as an SE12 decision |
+| Two concurrent NAS drive failures | No data loss (RAID 6); third failure before rebuild completes = array loss → restore from T3 | T3 copy existence (SE11-REQ-03) |
+| Host loss (board/CPU/PSU) | Rebuild host from version-controlled definitions; VMs restored from T2 archives onto replacement host or hosted equivalent (§160, §168) | Hardware-independent VM/container definitions (SE11-REQ-05) |
+| NAS enclosure loss | Restore durable data from T3; T1 continues operating without backup until NAS is replaced (degraded mode, time-boxed by SE12) | T3 |
+
+### 6.5 Capacity headroom
+
+| Tier | Installed | Headroom rule | Expansion path |
+|---|---|---|---|
+| T1 (M2_2 + M2_4) | 2 × 4 TB | Alert at 70 % used, architecture review at 85 % (§12.3) | No free M.2 slots: expansion = larger-capacity devices of the same class (scale-up) or moving artifact store to T2-fronted cache; recorded trigger |
+| T2 NAS | ~72.8 TiB usable | Alert at 70 %, review at 80 % | 2 free bays (RAID 6 expansion) + 4× M.2 slots for cache/metadata; the recorded smaller alternative is a 4-drive RAID 6 start (~36 TiB usable) with the remaining two drives added when SE12's retention model demands it — chosen only if SE12's Stage-1 retention volume is < 15 TiB (SE11-DEC-06) |
+| T3 | n/a | Must hold at least the irreplaceable subset defined by SE12 | Provider/medium selection by SE12 |
+
+## 7. Network architecture (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-06)
+
+### 7.1 Physical links and roles
+
+| Link | Speed / media | Endpoints | Role |
+|---|---|---|---|
+| L1 storage/core | 10GBase-T, Cat6a | Host NIC (PCI_E3) ↔ switch ↔ NAS 10GbE port 1 | Backup, artifact, database-dump, VM-archive transfers; "network capacity appropriate to measured artifact, backup, database, and build traffic" (§166) |
+| L2 management/upstream | 5 GbE onboard, Cat6a | Host onboard LAN ↔ switch | Host/VM management, upstream gateway, internet/external-provider traffic |
+| L3 NAS secondary | 10GbE port 2 (spare), 2×5GbE | NAS ↔ switch | Expansion: second 10GbE for a future second consumer or link redundancy; 5GbE for NAS management segment |
+| L4 worker links | 1 / 2.5 GbE (deferred) | Local workers ↔ switch access ports | "Worker links may be slower where sufficient" (§166) |
+| L5 uplink | per upstream gateway | Switch ↔ gateway | Internet; external AI providers; hosted runners |
+| Wi-Fi 7 / Bluetooth | — | Host (disabled) | Not part of the architecture; disabled in firmware (§13) |
+
+SE11-REQ-04: the storage/core path L1 must sustain ≥ 0.7 GB/s host↔NAS during concurrent build-cache activity, and shared storage or control paths must not be the first bottleneck during concurrent transfers (§166) — verified in SE11-AC-05.
+
+### 7.2 Switching / core role
+
+The switch (B17) is the single core: managed, VLAN-capable, at least 2×10GbE (seed minimum, §230) with ≥ 4×10GbE preferred so that host, NAS primary, NAS secondary and one future 10GbE consumer fit without replacement (SE11-ADR-07); 24× 1/2.5GbE access ports for workers, management devices and the gateway. Until the switch is installed, an interim point-to-point 10GbE link host↔NAS with L2 to the gateway is acceptable placement — not architecture — because all addressing is by DNS name and VLAN membership is a configuration attribute (§233 H.2).
+
+### 7.3 Segmentation (names only; SE14 designs addressing and policy, SE17 the rules)
+
+| Segment | Members | Purpose |
+|---|---|---|
+| `seg.mgmt` | Host management interface, NAS admin, switch management, UPS network service | Administrative plane; MFA-protected access (§59); no workload traffic |
+| `seg.storage` | Host 10GbE, NAS 10GbE | Backup/artifact traffic only; not routed to workers |
+| `seg.platform` | Core VM, Data VM, runtime namespaces | Stable runtime east-west |
+| `seg.build` | Build/CI VM, Validation/Staging VM, local containers | Build/test east-west; fault injection confined here |
+| `seg.worker` | Local workers (deferred), hosted-runner VPN/egress | Disposable execution |
+| `seg.egress` | Gateway-facing | Default-deny disclosure gateway for external model inputs (§66) sits on this boundary |
+
+### 7.4 East-west traffic and bottleneck avoidance
+
+- Build artifacts move Build/CI VM → artifact store (M2_2) over the host-internal virtual switch (no physical hop); only archival copies cross L1 to the NAS, scheduled outside peak build windows (SE20).
+- Database backups cross L1 at off-peak; restore drills (§14) measure actual throughput to replace the assumptions in §6.2.
+- Worker-to-core control traffic is small; worker artifact pulls are served from the host artifact store, not the NAS.
+
+### 7.5 Expansion ports / headroom
+
+Free after baseline: NAS 1×10GbE + 2×5GbE; host 2×USB4 (usable for emergency 10GbE/NVMe adapters), switch access ports per §7.2. Trigger for a second switch or a 10GbE-dense core is in §12.2.
+
+## 8. Physical power / placement architecture (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07)
+
+### 8.1 Power domains
+
+| Domain | UPS | Circuit (requirement, not design) | Loads | Status |
+|---|---|---|---|---|
+| PD-A | UPS-A CyberPower CP1500PFCLCD, 1500 VA / 1000 W, line-interactive AVR, 6 battery-backed outlets (B15) | Circuit A: separate 15 A breaker; UPS plugged directly into wall (§231) | Central host, NAS, switch (critical network), gateway if co-located | ADOPT WITH ENGINEERING CONSTRAINT |
+| PD-B | UPS-B ~1000 VA / 600 W pure sine, model TBD (B16) | Circuit B: second separate 15 A breaker (§231) | Rack PDU → local workers | DEFER / OPTIONAL with the rack |
+
+Isolation rule (§165): worker/rack power is isolated from the host/NAS UPS so a worker fault or overload cannot drop the durable tier.
+
+### 8.2 Device power envelopes and circuit/load assumptions
+
+| Device | Envelope used for planning | Source / assumption |
+|---|---|---|
+| Central host, no GPU | ~350–480 W peak at wall (CPU package ≤ 230 W + board/memory/4×NVMe/fans/NIC + PSU losses) | B1, B7; engineering estimate ASM-SE11-05, replaced by SE11-AC-06 measurement |
+| Central host, with GPU | +145 W → ~500–630 W peak | B11 |
+| NAS, 6 HDD + 2 M.2 | ~90–150 W (spin-up transient higher) | B12/B14 class; ASM-SE11-05 |
+| Switch + gateway | ~30–80 W | class estimate |
+| PD-A total | ~470–710 W without GPU; ~620–860 W with GPU — below the 1000 W UPS-A rating in both cases, but runtime at these loads is minutes, so the UPS is a controlled-shutdown device, not a ride-through supply (§165) | SE11-AC-06 verifies |
+| Whole installation | Seed planning figures: typical ~560 W, sustained peak ~1,150–1,300 W when the rack is present (§231) | To be measured; retained as the circuit-sizing input for the electrician |
+
+SE11-REQ-10 (qualified-professional requirement, code-regulated work not designed here): a licensed electrician verifies that circuits A and B are separate branch circuits of adequate rating for the measured/peak loads above, that receptacles, grounding and surge arrangements meet local code, and whether the optional dedicated 20 A circuit (§231) is warranted; SE11 supplies only the load figures and the two-domain requirement.
+
+### 8.3 Safe-shutdown dependencies (SE11-DEC-07)
+
+Topology: UPS-A USB-HID is connected to the NAS, whose UPS service acts as the network UPS server (B12: "UPS support / network UPS server"); the Windows host runs the matching network UPS client; VMs receive the shutdown signal from the host. Ordering on mains loss:
+
+1. T+0 s: on-battery event broadcast; `pool.background` and `pool.build` batch work paused (§175).
+2. T+60 s (if mains not restored): host initiates orderly VM shutdown Validation → Build/CI → Core → Data (Data last so dependants drain first); local workers (if any, on PD-B) are drained by their own UPS client.
+3. T+240 s or UPS "low battery", whichever first: host shuts down; the NAS continues to hold the network until the host confirms off, then shuts itself down on its low-battery threshold.
+4. SE11-REQ-06: the whole sequence must complete inside the measured UPS-A runtime at the measured PD-A load minus a 30 % reserve (SE11-AC-06); if it cannot, the load on PD-A is reduced (move switch/gateway to a separate small UPS) rather than the sequence shortened.
+
+The host must never depend on the NAS for its own shutdown path beyond the signal (no boot or shutdown dependency on NAS-hosted storage).
+
+### 8.4 Placement constraints (rack / desk / room)
+
+- Central host: tower chassis placed free-standing with unobstructed mesh front intake and rear exhaust, off the floor, on PD-A; not inside the 18U rack (rack is for workers/switch/PDU per §230).
+- NAS: adjacent to the host on PD-A, within Cat6a reach of the switch; 6×3.5-inch drives make it vibration-sensitive — solid surface, not stacked on the host.
+- Switch: rack-mounted when the rack exists; until then shelf-mounted next to the NAS, on PD-A battery-backed outlet.
+- Rack (deferred): 18U; 17U used with a gap after every device or 12U without gaps for micro trays (§230); 1U switch, 1U PDU, 1U power-brick shelf, worker trays sized to the selected worker form factor; PD-B feeds the PDU.
+- Room: lockable (§13.3), ambient within the device classes' operating range, no shared circuit with high-draw appliances (requirement to the electrician under SE11-REQ-10); the detailed thermal and rack layout belongs to SE11-POWER-COOLING-RACK.
