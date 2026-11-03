@@ -1,0 +1,156 @@
+---
+id: SE11-PHYSICAL-INFRASTR-HARDWARE
+version: 7
+status: complete
+owner: REVIEWER_EN
+based_on: [SE11-PHYSICAL-INFRASTR-HARDWARE]
+requirements: [SE11-REQ-17, SE11-REQ-18, SE11-REQ-23, SE11-REQ-24, SE11-NFR-05]
+---
+run_id: SMK-20261103114255:SE11-PHYSICAL-INFRASTR-HARDWARE:review:6
+round_id: SMK-20261103114255
+task_id: SE11-PHYSICAL-INFRASTR-HARDWARE
+reviewed_version: 6
+verdict: revise
+summary: >-
+  The authoritative-source and current-compatibility gates remain unsatisfied.
+  Explicitly declaring those gates blocked does not satisfy them or make them
+  inapplicable. The revised lease still lacks a bounded elapsed-time enforcement
+  mechanism under clock failure, and the revised evidence transition engine has
+  incomplete idempotency and producer-suspension semantics. This version is not
+  an implementation baseline.
+review_basis: >-
+  The target and dependency-absence declarations supplied in the context were
+  reviewed. No absent upstream document, manufacturer publication, commissioning
+  result or prior review artifact was assumed available. Re-review continuity
+  uses the previous finding identifiers and correction descriptions reproduced
+  in target section 0.4. EL consistency and register reconciliation cannot be
+  verified from the supplied corpus.
+correction_assessment:
+  - finding_id: REVIEWER-EN-SE11-PHYSICAL-001
+    disposition: remains_open
+    reason: Source absence is now disclosed accurately, but consumption and reconciliation are still absent.
+  - finding_id: REVIEWER-EN-SE11-PHYSICAL-003
+    disposition: remains_open
+    reason: Store-side leases address publisher loss only while the store clock progresses correctly; the claimed clock-fault bound is not enforced.
+  - finding_id: REVIEWER-EN-SE11-PHYSICAL-006
+    disposition: addressed
+    reason: S-2 now has an explicit NAS status source and bounded transition to HOLD; S-3 has separate NAS eligibility, circuit constraints and guard drills.
+  - finding_id: REVIEWER-EN-SE11-PHYSICAL-008
+    disposition: remains_open
+    reason: FC-02 is correctly documentary-only, but the G1 register is still empty and no supported, available configuration is established.
+  - finding_id: REVIEWER-EN-SE11-PHYSICAL-009
+    disposition: addressed
+    reason: The local OS-authenticated bootstrap channel removes the requirement to possess Part B/C tokens before their creation and custody verification.
+  - finding_id: REVIEWER-EN-SE11-PHYSICAL-010
+    disposition: addressed
+    reason: Incarnation-aware cursors and an explicit reset handshake remove dependence of event identity on wall-clock ordering across restarts.
+  - finding_id: REVIEWER-EN-SE11-PHYSICAL-011
+    disposition: remains_open
+    reason: The central transition table improves precedence and substitute-copy verification but leaves non-copy event identity and suspension enforcement incomplete.
+findings:
+  - id: REVIEWER-EN-SE11-PHYSICAL-001
+    severity: major
+    type: source_gap
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01
+    source_or_requirement_id: PL-REQ-ID-REGISTER
+    description: >-
+      Sections 0.1-0.3, 1 and 17 explicitly establish that the required register
+      was not consumed and that all upstream product and EL positions remain
+      unreconciled. The seed-only traceability table cannot establish compliance
+      with the higher-priority register. Redefining not_applicable to mean an
+      applicable but unmet source does not close finding 001. The statement that
+      unresolved_issues is empty because the author cannot resolve these gates
+      also does not resolve the missing authoritative baseline. No reconciled
+      downstream baseline or EL-consistency judgment is supported.
+    required_correction: >-
+      Retain this finding as open until the actual required register and upstream
+      inputs are available in the authorized corpus and consumed. Reconcile the
+      hardware positions, NFRs, assumptions, ADRs and contract governance against
+      their actual statements, record conflicts and bind the resulting requirement
+      identifiers. Remove the redefinition of not_applicable and the claim that
+      inability to resolve an applicable gate makes it resolved. Preserve the
+      implementation prohibition while evidence is absent; do not fabricate
+      register content or treat seed-only traceability as closure.
+  - id: REVIEWER-EN-SE11-PHYSICAL-008
+    severity: major
+    type: outline_gap
+    outline_id: QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03
+    source_or_requirement_id: SE11-AC-01
+    description: >-
+      Sections 11.2, 11.3 and 17 state that no G1 evidence row exists, fingerprint
+      v0 does not exist, and no coherent currently supported and practically
+      available configuration has been established. FC-02 now correctly excludes
+      commissioning as documentary closure, but this repairs the gate definition,
+      not the missing assessment. SEL-0, deferred part numbers and a future
+      evidence plan do not satisfy QC-AR-03. The criterion remains applicable;
+      encoding it as not_applicable cannot close finding 008. Section 17 is
+      expressly not a baseline sign-off, so the covered disposition for QC-AR-07
+      likewise cannot be read as an actual approval.
+    required_correction: >-
+      Supply attributable, dated authorized evidence for at least one coherent
+      configuration, close its applicable feasibility conditions using documentary
+      evidence, record substitutions with reason and impact, and produce the exact
+      selected fingerprint and baseline approval record. Until such evidence is
+      available, retain the criterion and this finding as unmet rather than
+      not_applicable, and do not claim actual baseline sign-off. A selection list
+      or a commissioning promise is not a substitute for the required assessment.
+  - id: REVIEWER-EN-SE11-PHYSICAL-003
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05
+    source_or_requirement_id: SE11-REQ-24
+    description: >-
+      Section 6.3b enforces expiry solely by store wall-clock comparisons. L2
+      checks skew only when a lease arrives, and L5 detects only a backward jump
+      beyond U relative to a wall-clock high-water mark. With the publisher down,
+      a store clock that stops, or progresses sufficiently slowly, can remain
+      below until-U without ever moving below hw_time-U. L3 then permits mutations
+      indefinitely despite expiry in elapsed time. A common time-source statement
+      does not specify a time-health check or a fail-safe when that source is
+      unavailable. Consequently the assertion that L2/L5 bound store time to the
+      publisher within U throughout an arbitrarily long outage, and the resulting
+      SE11-NFR-05 exposure guarantee, do not follow from these rules. AC-07e tests
+      large clock jumps but does not exercise this counterexample.
+    required_correction: >-
+      Specify an enforceable elapsed-time deadline in addition to the absolute
+      timestamp, using a monotonic time source with stated progress and suspend
+      semantics, bounded uncertainty and fail-closed behavior when time health
+      cannot be established. Define restart behavior when the elapsed-time anchor
+      cannot be trusted; a persisted lease alone must not renew its remaining
+      lifetime. Alternatively narrow the guarantee explicitly and establish the
+      required clock-health precondition with an enforcing watchdog. Extend
+      AC-07e to publisher outage with a stopped or slow wall clock, loss of time
+      synchronization, suspend/resume and restart, demonstrating that writes cannot
+      outlive the declared exposure bound.
+  - id: REVIEWER-EN-SE11-PHYSICAL-011
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05
+    source_or_requirement_id: SE11-REQ-17
+    description: >-
+      The authoritative table in section 6.3a is still not a complete implementable
+      event/state contract. P1c deduplicates by producer_id, copy_id and event,
+      whereas Part C supplies copy_id only for COPY/RESTORE records. Repeated
+      MECH_FIXTURE_OK records, CUSTODY events and DATASET_CREATED records therefore
+      have no defined distinct identities: treating the missing copy_id as null
+      suppresses later legitimate stage-gate evidence and can suppress later
+      DATASET_CREATED enforcement violations before the state guard runs. In
+      addition, the violation row promises producer suspension and admit DENY
+      until re-registration, but no suspension field or transition is defined.
+      The authoritative Admit rule depends only on state, rfail and mech_state;
+      a still-PROTECTED class with rfail zero and mech_state OK can therefore
+      derive ALLOW again on the next tick. Registration also unconditionally
+      assigns store(c), conflicting with the separate custody-transfer sequence
+      when the second KEYS producer registers. These are operational holes in the
+      revised correction, not resolved by declaring the table authoritative.
+    required_correction: >-
+      Define a unique event identity and idempotency scope for every event kind,
+      with copy correlation separate from event identity; distinguish a retry from
+      a new fixture run or dataset creation. Add an explicit producer lifecycle
+      and suspension latch, make active ownership a condition of admission and
+      evidence acceptance, and define recovery from suspension. Separate producer
+      registration from active-store ownership so registering a takeover producer
+      cannot transfer custody prematurely; specify the transfer target and atomic
+      ownership change. Extend AC-07f and AC-07d with repeated fixture runs, distinct
+      dataset creations with absent copy_id, retries, suspension followed by ticks
+      and heartbeats, and second-producer registration before custody transfer.
