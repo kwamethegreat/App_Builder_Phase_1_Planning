@@ -1,0 +1,58 @@
+---
+id: SE11-PHYSICAL-INFRASTR-HARDWARE
+version: 7
+status: complete
+owner: REVIEWER_EN
+based_on: [SE11-PHYSICAL-INFRASTR-HARDWARE, SEED-01]
+requirements: [ENV-DEC-017, SE11-REQ-12, SE11-REQ-16, SE11-GATE-06, SE11-AC-05]
+---
+run_id: SMK-20261103192618:SE11-PHYSICAL-INFRASTR-HARDWARE:review:6
+task_id: SE11-PHYSICAL-INFRASTR-HARDWARE
+reviewed_version: 6
+verdict: pass
+summary: >-
+  The revised host deadline is anchored to the last valid ONLINE update.
+  Timely observations retain the bounded, flush-eligible path; late observations
+  and recovery from blindness retain the blind deadline and use local-only
+  shutdown. The previously described delayed-observation counterexamples no
+  longer violate the ordering proof. Installed-rating power limits, evidence-led
+  memory selection and negotiated management-link speeds remain explicit.
+  The architecture covers all fourteen outline areas, seven quality criteria
+  and four exclusions. One minor drill-description inconsistency remains.
+review_scope:
+  - Target version 6 supplied in context, including revision history and acceptance assertions.
+  - SEED-01 section §229.1 checked against the cited repository sha and UPS baseline.
+  - Internal arithmetic, physical relationships, failure ownership and revised shutdown paths.
+  - Smoke-run exemptions applied to absent upstream documents, contract registration and external verification.
+prior_finding_disposition:
+  - id: REVIEWER_EN-SE11-PHYSICAL-02
+    disposition: closed
+    reason: >-
+      A = t_ON + T_ob bounds timely-path completion by D + T_ob + S_H.
+      Late-path A_r is bounded by B_ON and cannot authorize a NAS flush.
+      The examples at t_obs = 50 and 70 seconds therefore remain inside I2
+      without requiring host-before-NAS ordering.
+findings:
+  - id: REVIEWER_EN-SE11-PHYSICAL-05
+    severity: minor
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-14
+    source_or_requirement_id: SE11-AC-05
+    description: >-
+      Section 14.1 has two inaccurate drill expectations despite the corrected
+      normative rules in section 7.5. Drill (j) calls t_obs = t_ON + T_ob - P
+      later than D, but the planning values with t_ON = 0 yield t_obs = 20 = D;
+      that run does not exercise the claimed beyond-D observation. Drill (e)
+      names B_OB as the initiating deadline even when STALE has not yet occurred.
+      In the worked example, A = 40 and STALE would occur at 90, so initiation
+      occurs on A, before B_OB can be latched. These descriptions can mislabel
+      evidence from a conforming client; they do not invalidate the normative
+      completion bounds.
+    required_correction: >-
+      Give drill (j) an explicit admissible t_ON and t_obs satisfying
+      D < t_obs <= t_ON + T_ob, or use the worked 25-second observation with
+      t_ON = 0 and explicitly control receipt timing. In drill (e), expect A
+      when initiation precedes STALE; expect B_OB only if it was actually
+      latched before initiation. Preserve the existing completion and ordering
+      assertions and record the deadline that actually fired.
+unresolved_issues: []
