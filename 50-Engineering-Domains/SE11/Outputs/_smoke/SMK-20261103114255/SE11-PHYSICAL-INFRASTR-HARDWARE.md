@@ -1149,3 +1149,7 @@ No owner has published a contract id in this run (§0.1); none is invented. Each
 | BND-01 … BND-04 | Covered (excluded as required) | §15 |
 
 **Required source PL-REQ-ID-REGISTER: UNMET SOURCE — reported `not_applicable`.** Reason line: the source could not be applied in this run because it does not exist in the repository (SE11-DEP-01); this is an open source gap, not a judgement that the source is irrelevant; the document is not source-complete and is not approved for implementation (§0.3, §17). The reported value asserts nothing about satisfaction.
+
+## 20. Precedence note
+
+Where a summary figure elsewhere in this document abbreviates a derivation, the derivation governs: the restart budgets are those of the §8.3 table (M1: 540 s for S-1/S-3, 630 s for S-2; M3: 660 s; bound 720 s, SE11-REQ-20) — the "M1 ≤ 540 s" shorthand in §3 refers to S-1/S-3 only; memory figures are those of Table 5.3-R and the §5.3 procedure; storage budgets are those of the §6.1a identity; protection semantics are those of §6.3; contract semantics are those of §18.2.
