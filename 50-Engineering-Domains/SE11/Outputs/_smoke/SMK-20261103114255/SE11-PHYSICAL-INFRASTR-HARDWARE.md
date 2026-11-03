@@ -195,3 +195,159 @@ Allocation maps workload classes to **resource pools**, never to named devices; 
 **Simultaneous accounting at baseline (corrects v1's mixed units):** vCPUs assigned to VMs = 4 + 4 + 8 + 16 = **32 vCPU on 32 LP** (1 : 1, no vCPU oversubscription at baseline; bursts happen *within* a VM's own vCPU count, not by adding vCPUs). Guaranteed LPs (sum of reserves) = 4 + 4 + 4 + 4 = **16 LP (50 %)**. Floating LPs = **16**, claimed first by the host root partition (typical need 2–4 LP, ASM-SE11-03) and then by VMs in weight order 200 : 200 : 150 : 100, which yields the deterministic throttling order background → build → validation → (never) core/data under saturation. Memory accounting is in §5.3 per candidate.
 
 Rule SE11-REQ-01 (restated): `pool.core`, `pool.data` and `pool.runtime` reservations are hard — static memory, 100 % processor reserve, never oversubscribed; every other pool has a declared guaranteed floor and ceiling or an explicit membership share as above. Rule SE11-REQ-14: the reservation mechanism is the hypervisor's per-VM processor reserve/limit/weight and static-versus-dynamic memory controls plus in-VM cgroup shares for members; no pool relies on "best effort".
+
+## 5. Compute architecture (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04)
+
+### 5.1 Host-role requirements
+
+| Requirement | Specification | Source |
+|---|---|---|
+| CPU | 16 physical cores / 32 logical processors, homogeneous cores, 64 MB L3, hardware virtualization + IOMMU enabled in firmware | B1 (§227.1); VM isolation (§168) |
+| Memory | DDR5 UDIMM matched kit on four slots (board maximum 256 GB, B3); quantity per §5.3; EXPO only after the stability pass; fallback DDR5-5600/5200 as the seed directs | B4 (§227.4), §162 |
+| PCIe / slots | PCI_E1 Gen5 x16 reserved for the deferred accelerator; PCI_E3 Gen4 x4 carries the 10 GbE NIC; PCI_E2 Gen3 x1 unused (insufficient for 10 GbE); 2×USB4 free for emergency storage/console | B3 (§227.3) |
+| Local NVMe (4 slots, all populated) | M2_1 Gen5 x4 (CPU): 1 TB host system; M2_2 Gen5 x4 (CPU, shares with USB4): 4 TB Build/Validation VMs + artifact store; M2_3 Gen4 x2 (chipset, shares with PCI_E3): 1 TB scratch; M2_4 Gen4 x4 (chipset): 4 TB Core/Data VMs + platform data + platform container layers; total 10 TB | B5, B6 (§227.5–§227.6), §163; mapping §6.1 (SE11-DEC-09) |
+| Host OS / hypervisor | Windows 11 Pro with Hyper-V; Linux VMs for all durable services; WSL2 + Docker Desktop for interactive work only | B9 (§227.9), §166–§168 |
+| Firmware baseline | UEFI Secure Boot and TPM 2.0 enabled; Wi-Fi 7 / Bluetooth disabled; settings baseline in §13.1 | §13 |
+| Thermal | Dual-tower air cooling 157 mm in a mesh-front mid-tower with three 140 mm intake fans; sustained 230 W CPU package (+145 W optional GPU) validated by SE11-AC-04 | B2, B8 |
+
+### 5.2 Processor accounting and reservation mechanism (SE11-REQ-14)
+
+| Quantity | Value | Basis |
+|---|---|---|
+| Physical cores | 16 | B1 |
+| Logical processors (LP) available to the hypervisor | 32 | B1 (SMT) |
+| vCPUs assigned to VMs | 32 (Core 4, Data 4, Validation 8, Build 16) | §4 |
+| vCPU : LP ratio | 1 : 1 at baseline | no oversubscription by vCPU count |
+| Guaranteed LPs (Σ processor reserve) | 16 (Core 4, Data 4, Validation 4, Build 4) | reserve % × vCPUs |
+| Floating LPs | 16 | host root partition first (2–4 LP typical, ASM-SE11-03), then VMs by weight 200 : 200 : 150 : 100 |
+
+Mechanism on the selected host platform: per-VM **processor resource controls** (virtual machine reserve %, virtual machine limit %, relative weight) and per-VM **memory controls** (static memory = hard reservation; Dynamic Memory with minimum/maximum for burst pools). Members of a shared budget (`pool.agents`, `pool.test`, `pool.background`, `pool.runtime`) are bounded inside their VM by Linux cgroup v2 `cpu.weight`, `cpu.max`, `memory.min`, `memory.max` as listed in §4. Admission: a new VM or member may be created only if (a) Σ reserves stays ≤ 16 LP, (b) Σ static memory + Σ dynamic minimums + host reserve ≤ installed memory, and (c) the pool's storage volume is already mapped in §6.1. This rule is enforced by the version-controlled VM definitions and checked in SE11-AC-03; its behaviour under saturation is verified by SE11-AC-12.
+
+### 5.3 Memory sizing: candidates, hypothetical envelopes and decision rule (SE11-DEC-03, revised)
+
+**Evidence status.** No measured workload exists (§0.1: EL estimates and SE01 capacity model unavailable). The envelopes below are therefore **hypothetical planning envelopes** (ASM-SE11-03) derived only from the five required logical environments (§156) and the layout (§167). They are not evidence, they do not justify any quantity, and they are replaced by the sizing document's model and by measured p95 values (§234 H.3).
+
+| Candidate | Configuration (specification class) | Hypothetical envelope (host 16 + WSL2 8 + Core + Data + Validation min/max + Build min/max) | Fit | Scale path | Trade-off recorded |
+|---|---|---|---|---|---|
+| **M-A** | 2 × 64 GB matched pair = 128 GB; two slots free | 16 + 8 + 24 + 32 + (12→20) + (12→20) = floor **104 GB**, ceiling **120 GB** | Fits 128 GB with 8 GB headroom at ceiling | Add a second matched pair (re-validate stability, SE11-AC-04 memory pass; 4-DIMM training fallback per §227.4 applies) or replace the kit | Smallest justified start (§158, §238); expansion is not a "single matched kit" (§227.4) — stability must be re-proven; Data VM working set capped at 32 GB until expanded |
+| **M-B** | 4 × 64 GB single matched kit = 256 GB (seed reference, board maximum) | 16 + 8 + 32 + 64 + (16→48) + (16→64) = floor **152 GB**, ceiling **232 GB** | Fits 256 GB with 24 GB headroom at ceiling | None (board maximum, hard ceiling REV-MEM) | Buys capacity the envelope does not demonstrate (§238 conflict unless the model shows it); avoids a later kit mix; 4-DIMM training risk flagged by the seed itself |
+| **M-C** | Hosted/managed data services for `pool.data` (and optionally hosted validation replica); local host at M-A | M-A envelope minus the Data VM: floor **72 GB**, ceiling **88 GB** | Fits 128 GB (or 96 GB class) | Hosted elasticity | Acceptable per §238 and §160; confidential-processing boundary (§66) and economics (SP16, unavailable) decide; latency to local Core VM becomes a design input for EL |
+
+**Decision rule (SE11-DEC-03).** Let F and C be the committed floor and ceiling produced by SE11-HARDWARE-CAPACITY-SIZING from a traceable Stage-1 workload inventory (concurrent builds, database and search working sets, validation replica size, agent/test concurrency — the inputs EL-ENGINEER-ESTIMATE-CAPACITY and SE01 own). The initial quantity is the smallest candidate whose installed capacity satisfies capacity ≥ 1.25 × F **and** capacity ≥ C + 8 GB. If the host must be built before such a model exists, the seed's H.1 ("start productively") and H.3 ("measure before resizing") apply: **M-A** is installed, unless the Stage-1 inventory already contains a single component whose working set exceeds 32 GB, in which case M-B; the choice and its basis are recorded as SE11-DEC-03a in the sizing document. **256 GB is never adopted on the strength of §5.3 alone.** Non-ECC on the central node is accepted for every candidate (SE11-ADR-03) with the ECC platform class recorded as the substitute if SE11-RISK-02 materialises.
+
+### 5.4 Virtualization / host implications
+
+- VM count and boundaries remain an engineering decision (§167); the four Linux VMs are the minimum that satisfies the isolation rule of §156. Merging Core and Data into one VM is permitted only if the static memory floors are preserved, both stay on M2_4, and SE17 accepts the shared blast radius.
+- Highest-priority VMs (Core, Data) use static memory and 100 % processor reserve; they are never configured for dynamic over-commit (SE11-REQ-01).
+- Snapshots of the Validation and Core VMs are taken before any firmware/driver change (§10.4) and replicated to `pool.durable`.
+- Nothing in the VM layer may encode physical slot ids, device serials or the host name; the portability requirement §160 applies to every VM definition (SE11-REQ-05). Storage is referenced by volume label / stable identifier, not by slot.
+- Per-virtual-disk IOPS controls (hypervisor storage QoS minimum/maximum) are part of the host configuration; their availability on the chosen host OS edition is confirmed in SE11-AC-03, and the fallback if unavailable is the stricter device separation of §6.1 alone (recorded in SE11-DEC-09).
+
+### 5.5 Accelerator (deferred) preconditions
+
+The GPU (B11) stays DEFER / OPTIONAL until all of the following hold: (a) a measured trigger TRG-GPU (§12.2: local-inference latency/privacy/cost case or GPU-required application testing, §176); (b) SE11-AC-02 confirms PCI_E1 x16 availability, 241 mm single-slot clearance and the 12V-2x6 cable; (c) SE11-AC-06 confirms measured full-load system draw plus 145 W ≤ 80 % of the 750 W PSU rating; (d) SE11-AC-03 confirms a supported path to expose the GPU to a Linux VM on the client hypervisor (device assignment or partitioning) — if none exists, the fallback is a host-level local-model service exposed to VMs over the internal virtual network, recorded as a new SE11-DEC; (e) local models are registered under the same AI-dependency governance as external models (§177). Any accelerator above 145 W, a second accelerator or a dual-slot card is ESCALATE ARCHITECTURE IMPACT (SE11-ADR-04).
+
+## 6. Storage architecture (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05)
+
+### 6.1 Authoritative physical mapping of every volume (SE11-DEC-09 / SE11-ADR-09)
+
+This table is the single source of truth; v1's conflicting placements are withdrawn. Sizes are initial allocations (candidate envelope, ASM-SE11-03) and are thin-provisioned so that the sizing document can resize without re-mapping.
+
+| Volume | Pool | Physical device (slot, link) | Initial allocation | Notes |
+|---|---|---|---|---|
+| Host OS, hypervisor, WSL2 distro disk | `pool.admin` | **M2_1** 1 TB (Gen5 x4, CPU) | whole device | T0 system; rebuildable from version-controlled host build; encrypted (§13.4) |
+| Core VM system disk | `pool.core` | **M2_4** 4 TB (Gen4 x4, chipset) | 128 GB | storage-QoS minimum IOPS (defence in depth) |
+| Core VM state disk (queues, registry, coordination) | `pool.core` | M2_4 | 256 GB | |
+| Data VM system disk | `pool.data` | M2_4 | 64 GB | |
+| Data VM database / search / cache disk | `pool.data` | M2_4 | 1.5 TB | database-consistent backups to T2 |
+| Platform container image layers (Core/Data services) | `pool.core`/`pool.data` | M2_4 | 256 GB | D-REB |
+| M2_4 headroom | — | M2_4 | ~1.8 TB | alert 70 %, review 85 % |
+| Validation VM system + replica data disks | `pool.validate` | **M2_2** 4 TB (Gen5 x4, CPU; shares with USB4) | 64 GB + 768 GB | production-like replica; fault injection only here |
+| Build VM system disk | `pool.build` | M2_2 | 64 GB | |
+| Build VM container layers, agent/test workspaces | `pool.build` members | M2_2 | 512 GB | D-REB |
+| Artifact store (active artifacts, served to all pools over the internal virtual switch) | `pool.build` | M2_2 | 1 TB | D-BND; archival copies to T2 |
+| M2_2 headroom | — | M2_2 | ~1.6 TB | |
+| Build cache / scratch | `pool.build` | **M2_3** 1 TB (Gen4 x2, chipset; shares with PCI_E3) | whole device | D-REB; first device to exhaust TBW |
+| **Lane-sharing fallback** (if SE11-AC-02 shows M2_3 and PCI_E3 cannot operate together): scratch | `pool.build` | M2_2 | 512 GB virtual disk with storage-QoS **maximum** IOPS cap | Impact: Build-internal contention only (scratch, artifacts, Build VM all Medium); Highest-priority pools untouched; M2_2 headroom falls to ~1.1 TB; TBW consumption of M2_2 rises — telemetry threshold TRG-NVME-TBW applies; recorded as SE11-DEC-02 fallback |
+| T2 durable | `pool.durable` | NAS RAID 6 (count per §6.7) over L1 | per §6.7 | snapshots, backups, evidence, archives, mirrors (§164) |
+| T3 isolated copy | — | off-site / hosted, provider selection per NT16 (unavailable) | class D-IRR only | §6.3 |
+
+**Why the mapping deviates from the seed's literal role labels (SE11-DEC-09).** The BOM labels M2_2 "VM & artifact store" and M2_4 "platform data / DBs / containers" (§227.6). Placing *all* VM disks on M2_2 would put the Highest-priority Core and Data system disks on the same device as Medium-priority build artifacts, violating the reservation principle (§157: reserve "storage I/O … for stable platform operation") and SE11-REQ-02. The role labels are guidance on purpose, not an isolation rule; moving the Highest-priority VM disks to M2_4 keeps M2_4 entirely Highest-priority and M2_2 entirely High/Medium. Impact: M2_4 carries both VM system disks and the database — all one priority class, protected additionally by storage-QoS minimum IOPS; M2_2 carries Validation (High) with Build (Medium), bounded by storage-QoS maximum IOPS on build/scratch disks. SE11-REQ-02 is satisfied without exception.
+
+### 6.2 Tiers and dataset classes
+
+| Tier | Device(s) | Role (seed) | Durability boundary | Policy owner |
+|---|---|---|---|---|
+| T0 system | M2_1 | Windows + WSL2 (§227.5) | Rebuildable; no unique data | SE20 (host build), SE17 (encryption) |
+| T0 scratch | M2_3 (Gen4 x2) | Build cache / scratch (§227.5) | Disposable | SE11 |
+| T1 hot, Highest | M2_4 | Core/Data VMs, platform data, DBs, platform containers | Independent volume; snapshot + replication to T2 | SE12 (data), EL (VM definitions) |
+| T1 hot, High/Medium | M2_2 | Validation/Build VMs, artifact store | Independent volume; archival replication to T2 | SE12 (artifact retention) |
+| T2 durable | NAS RAID 6 | Backups, snapshots, release evidence, VM/container archives, artifacts, mirrors (§164) | Dual-parity array + snapshots; "not the only backup" (§164) | SE12 |
+| T3 isolated copy | Off-site / hosted, encrypted | "independent/off-site or otherwise isolated copy" for irreplaceable data (§164) | Independent of room, UPS, NAS and host | SE12 (policy), SE17 (keys) |
+
+**Dataset classes (provisional default, ASM-SE11-08; SE12 is the classification owner and replaces this table when its document exists):**
+
+| Class | Definition | Examples | Minimum protection |
+|---|---|---|---|
+| D-IRR | Irreplaceable: cannot be re-derived from any other platform data | Source repositories and IaC/configuration, non-synthetic platform databases, release-evidence packages, decision logs, inventory records, secret/key backups | T1 + T2 + **verified T3** before the dataset exists |
+| D-BND | Bounded loss: re-derivable from D-IRR within an accepted window | Build artifacts, locally built images, validation results, telemetry history | T1 + T2; loss window accepted by SE12 |
+| D-REB | Rebuildable from definitions or external sources | Caches, scratch, pulled container layers, VM system disks | T1 only |
+
+### 6.3 Protection activation rule (SE11-REQ-13; corrects finding 009)
+
+1. **Protection levels.** `PL-T2` = T1→T2 snapshot and replication verified (SE11-AC-07a). `PL-T3` = T3 mechanism commissioned and a restore from T3 verified for each D-IRR class (SE11-AC-07b).
+2. **Admission rule.** A D-IRR dataset may be created on the platform only while `PL-T3` is active for its class. In `PL-T2` mode only D-BND and D-REB data may exist; the Data VM holds synthetic or rebuildable data only.
+3. **Class-specific activation.** Source/configuration repositories: the T3 copy is a hosted remote at an external repository service, active before any local hardware is commissioned (§160 keeps authoritative source in version control outside any single host) — this satisfies `PL-T3` for that class from day one. Databases, release evidence, decision logs, inventory, key backups: the encrypted off-site copy mechanism must pass SE11-AC-07b before the first non-synthetic record is admitted.
+4. **Interval and verification.** T3 copy interval ≤ 24 h (SE11-NFR-05); restore verification at every stage gate and after any change to the T3 mechanism or its keys.
+5. **Enforcement.** SE11-AC-10 (baseline sign-off) cannot pass while any D-IRR dataset exists in `PL-T2` mode; SE20's admission checklist for the first stable-runtime baseline includes this check; EL's Definition of Ready for data-bearing services references SE11-REQ-13 (EL-ENGINEER-DEFINITI-READY unavailable — requested in §18).
+6. **Residual.** Between the loss of the T3 mechanism and its restoration, no new D-IRR data is admitted (platform runs in `PL-T2` with existing D-IRR data exposed to FD-ROOM); the exposure window is logged by SE20 and bounded by SE12's policy.
+
+### 6.4 Bandwidth / IOPS / latency assumptions (device-class figures from the BOM; measured values replace them in SE11-AC-04)
+
+| Path | Nominal from BOM | Engineering assumption used for design |
+|---|---|---|
+| M2_1, M2_2, M2_4 (Gen4 x4 devices) | up to 7,300 / 6,300 MB/s (§227.5–§227.6) | Sustained mixed workload 2–4 GB/s per device; sub-millisecond latency; NVMe is not the first bottleneck |
+| M2_3 (Gen4 x2 slot shared with PCI_E3) | device 7,300 MB/s; slot ≈ half of x4 | ≈ 3–3.5 GB/s ceiling; acceptable for scratch; verified in SE11-AC-02/04 |
+| Host ↔ NAS over 10 GbE (L1) | 10 Gb/s ≈ 1.1–1.2 GB/s wire | 0.7–1.0 GB/s sustained for backup/artifact transfer; a 4–6 drive RAID 6 CMR array delivers on the order of 0.5–1.0 GB/s sequential and far lower random IOPS — the NAS is never used for random-IO workloads (§164) |
+| Endurance | 600 TBW (1 TB), 2,400 TBW (4 TB) (§227.5–§227.6) | Scratch (M2_3) exhausts TBW first; TBW telemetry mandatory (§10.3); replacement by specification class (§11.4) |
+
+### 6.5 RAID / replication boundaries
+
+- Host NVMe: no RAID. Independence of M2_2 and M2_4 is the only host-level isolation; redundancy is by replication to T2 (SE11-ADR-05). Rationale: host mirroring would double NVMe cost for a tier whose durability requirement is met by snapshot + replication and would not protect against host loss, the dominant failure domain (§9).
+- NAS: RAID 6 at any drive count ≥ 4 (dual parity is mandatory at 20 TB per drive because the rebuild window — planning assumption 1–3 days under concurrent load, ASM-SE11-04 — must tolerate a second loss). Snapshots guard against logical corruption; T3 guards against array, enclosure, power or site loss (§164).
+- Replication is one-way T1 → T2 → T3; T2 never serves as a live datastore for VMs or databases.
+- The BOM's NVMe is a client-class device; power-loss protection of in-flight writes is **not asserted** (§11.2). Crash consistency therefore relies on filesystem journaling in every VM, database write-ahead logging with synchronous commit (SE12), and NAS copy-on-write; all are verified by the abrupt-loss drill SE11-AC-13 (SE11-NFR-07).
+
+### 6.6 Recovery expectations (hardware-capable targets stated to SE12; SE12 sets the binding RPO/RTO)
+
+**T2-only recoveries (no T3 dependency):**
+
+| Scenario | Hardware-capable target | Dependency |
+|---|---|---|
+| M2_4 failure (Core + Data VMs, platform data) | Full platform outage; restore both VMs and database from the last T2 snapshot/backup; data loss ≤ snapshot interval (≤ 1 h, SE11-NFR-05); RTO ≤ 4 h per VM | Spare NVMe of the §11.4 class; SE12 schedule |
+| M2_2 failure (Validation + Build VMs, artifacts) | Build/validation outage; runtime continues; restore from T2 archives or rebuild from definitions; D-BND loss within SE12's accepted window | Spare NVMe |
+| M2_1 failure (host OS) | All VMs stop until the host OS is rebuilt from the version-controlled host build onto a replacement device; VM disks on M2_2/M2_4 remain intact (no T2 restore needed unless they also fail) | Spare NVMe; host build definition in version control |
+| M2_3 failure | Rebuild caches; no data loss | Spare NVMe or fallback mapping |
+| Single NAS drive failure | No data loss; degraded; rebuild window ASM-SE11-04; replacement drive of equivalent class | Free bays allow a hot spare as an SE12 decision |
+| Two concurrent NAS drive failures | No data loss (RAID 6) | — |
+| Host loss (board/CPU/PSU) with intact NVMe | Move the NVMe devices to a replacement host of the §11.4 class or restore VMs to a hosted equivalent (§160, §168) | Hardware-independent definitions (SE11-REQ-05) |
+
+**T3-dependent recoveries (valid only in `PL-T3` mode; in `PL-T2` mode no D-IRR data exists by rule, so the residual is the loss of D-BND/D-REB only):**
+
+| Scenario | Hardware-capable target | Dependency |
+|---|---|---|
+| Third NAS drive failure before rebuild completes (array loss) | Restore D-IRR from T3; D-BND re-derived | Verified T3 copy |
+| NAS enclosure loss | T1 continues without a local backup target (degraded, time-boxed by SE12); D-IRR protected by T3 until NAS is replaced | T3 |
+| Host loss with NVMe loss, room/site loss (FD-ROOM) | Rebuild on replacement or hosted infrastructure from T3 (D-IRR) and definitions; D-BND re-derived | T3, hosted fallback |
+
+### 6.7 Capacity headroom and NAS capacity candidates (SE11-DEC-06, revised)
+
+| Tier | Candidate / installed | Headroom rule | Expansion path |
+|---|---|---|---|
+| T1 (M2_2 + M2_4) | 2 × 4 TB (fixed by B6) | Alert 70 %, architecture review 85 % (REV-STORAGE-HOT) | No free M.2 slots: larger devices of the same class (scale-up) or artifact store fronted by T2; SATA ×4 for cold tiers only |
+| T2 NAS — **N-A** | 4 × 20 TB RAID 6 → 40 TB nominal, ≈ 36.4 TiB usable (derived with the seed's 80 TB → 72.8 TiB ratio, ASM-SE11-04); 4 bays free | Alert 70 %, review 80 % | Add same-class drives to free bays on TRG-NAS-CAP (online array expansion support by the NAS OS is not established — SE11-AC-01 item) |
+| T2 NAS — **N-B** | 6 × 20 TB RAID 6 → ≈ 72.8 TiB usable (seed reference); 2 bays free | as above | 2 free bays |
+| T2/T3 — **N-C** | Hosted object storage for T2 and/or T3 (NAS deferred or absent) | provider quota | Hosted elasticity; acceptable per §238; economics unknown (SP16 unavailable) |
+| T3 | Must hold at least the D-IRR set | n/a | Provider/medium per SE12 and NT16 |
+
+**Decision rule (SE11-DEC-06).** Let V be SE12's modelled retention volume for the first two stages (D-IRR + D-BND copies at the retention policy, including snapshot overhead). Choose N-A if V ≤ 22 TiB (≈ 60 % of N-A usable); N-B if 22 TiB < V ≤ 44 TiB; above 44 TiB the answer is REV-STORAGE (architecture revision), not simply more drives; N-C if gate G-LOCAL fails for the NAS. If the NAS must be commissioned before the model exists, **N-A** is installed (H.1/H.3) and the choice is recorded as SE11-DEC-06a in the sizing document. **Six drives are never adopted on the strength of this document alone.**
