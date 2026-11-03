@@ -1,0 +1,207 @@
+---
+id: SE11-PHYSICAL-INFRASTR-HARDWARE
+version: 2
+status: complete
+owner: REVIEWER_EN
+based_on: [SE11-PHYSICAL-INFRASTR-HARDWARE, SEED-01]
+requirements: [ENV-DEC-017, SE11-DEC-03, SE11-DEC-06, SE11-REQ-01, SE11-REQ-02, SE11-REQ-03, SE11-REQ-06, SE11-AC-01]
+---
+task_id: SE11-PHYSICAL-INFRASTR-HARDWARE
+reviewed_version: 1
+verdict: revise
+review_basis: >-
+  Reviewed the supplied target and criteria, and SEED-01 sections 74, 166,
+  227, 228 and 238 at sha 2d3a171d6961a8790f5a9812eeb1e3907f188242.
+  The context identifies the required register and upstream dependencies as missing;
+  conformity to their requirements and EL decisions cannot be established.
+  The exact seed/BOM citation and item-level dispositions are present, but the
+  baseline is not buildable or adequately justified as written.
+findings:
+  - id: REVIEWER-EN-SE11-PHYSICAL-001
+    severity: major
+    type: source_gap
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01
+    source_or_requirement_id: PL-REQ-ID-REGISTER
+    description: >-
+      The preamble and section 19 classify the mandatory Master Requirement ID
+      Register as not_applicable solely because it is unavailable. The required
+      PM09, NT16, EL and SP16 dependencies are also missing in the context, yet
+      section 16.6 declares no upstream conflicts and section 17 signs off an
+      architecture complete for Stage 0. Direct seed access for hardware facts
+      does not establish a waiver of Stage-0 requirements or EL architecture
+      review, and unavailable sources are not inapplicable requirements.
+    required_correction: >-
+      Replace the not_applicable disposition with an explicit unavailable-source
+      limitation; identify the missing authoritative inputs and the decisions
+      affected. Distinguish seed-derived provisional decisions from reconciled
+      requirements and remove the unsupported upstream-consistency assertion.
+      Reconcile the baseline to register IDs and cited EL decisions before
+      declaring it approved for downstream implementation; do not invent those
+      IDs, approvals or dependency contents.
+  - id: REVIEWER-EN-SE11-PHYSICAL-002
+    severity: major
+    type: unsupported_addition
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04
+    source_or_requirement_id: ENV-DEC-017
+    description: >-
+      B4 and SE11-DEC-03 adopt the board's maximum 256 GB configuration on the
+      strength of invented reservation estimates. Section 5.2 explicitly says
+      there is no measured workload; its 152 GB floor does not establish the
+      asserted 192 GB lower bound or the need for 256 GB. B14 similarly adopts
+      six 20 TB drives without a retention-volume model, making the smaller
+      alternative conditional on evidence that has not been supplied. ADR-01
+      incorrectly treats local durable infrastructure as required when rejecting
+      an all-hosted baseline: SEED-01 section 238 expressly permits managed/hosted
+      equivalents and requires workload and economic justification for local capacity.
+    required_correction: >-
+      Keep the maximum reference configurations as candidates rather than adopted
+      capacity until a traceable workload/concurrency and retention model justifies
+      them. Provide the evidence and calculations supporting the selected initial
+      memory and storage quantities, compare smaller or hosted alternatives, and
+      separate hypothetical reservation estimates from workload evidence. Correct
+      ADR-01 to preserve the seed's conditional local-provisioning rule.
+  - id: REVIEWER-EN-SE11-PHYSICAL-003
+    severity: major
+    type: scope
+    outline_id: QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-06
+    source_or_requirement_id: SEED-01 §74
+    description: >-
+      Sections 11.4 and 17 claim SE11-CONTRACT-hardware-baseline@1 is registered
+      and published without a cited registration artifact. Section 18 consumes
+      capacity, retention/recovery, networking, security and operations inputs via
+      generic document labels rather than owned contract IDs. Section 13 creates
+      SE17-CTRL slugs while saying SE17 has yet to assign control IDs, and section
+      3 postpones NFR mapping. The handoff also assigns VLAN/switch design to
+      SE14 without an ownership contract; the seed identifies SE14 as API,
+      Integration & Portability Engineering, not physical-network engineering.
+    required_correction: >-
+      Cite the actual versioned registration for the provided contract and an
+      owner plus contract ID for each consumed interface. Reconcile responsibilities
+      with the seed domain boundaries; retain physical-network responsibility in
+      SE11 unless an authoritative contract assigns it otherwise. Replace purported
+      foreign control IDs with cited owner-defined controls, or explicitly label
+      local proposals under SE11 identifiers. Map quality attributes to measurable
+      NFR IDs. Do not describe proposed or unavailable contracts as published facts.
+  - id: REVIEWER-EN-SE11-PHYSICAL-004
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04
+    source_or_requirement_id: SE11-REQ-01
+    description: >-
+      Section 5.2 mixes physical host cores with guest vCPUs and reports 18 of 32
+      threads reserved by adding unlike units. It gives no implementable mapping
+      from the stated floors to Hyper-V scheduling/reservation controls. Section
+      4 requires every pool to have a floor and ceiling, but runtime shares core/data
+      VMs without a defined share, while agents, tests and background work have no
+      enforceable individual budgets. Consequently an implementer cannot establish
+      that stable runtime remains protected under simultaneous build/validation load.
+    required_correction: >-
+      Normalize physical-core, logical-processor and guest-vCPU accounting, provide
+      correct simultaneous totals, and cite or define the reservation/admission
+      mechanism for the selected host platform. Specify whether runtime is included
+      in core/data budgets and define budgets or explicit shared-budget membership
+      for every pool. Add a contention test that verifies protected floors and
+      deterministic throttling or shedding when aggregate demand exceeds capacity.
+  - id: REVIEWER-EN-SE11-PHYSICAL-005
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05
+    source_or_requirement_id: SE11-REQ-02
+    description: >-
+      Section 4 places Core and Data VM backing on M2_4, whereas sections 5.3
+      and 6.1 place VM disks on M2_2 alongside Build/CI and artifacts. Under the
+      latter layout, both Highest-priority pools depend on the same device as
+      Medium-priority workloads, contradicting SE11-REQ-02 and the claim that build
+      saturation cannot starve them. Section 9 calls M2_2 loss partial availability
+      even though losing all VM system disks can stop both control and data services.
+      The scratch-on-M2_2 fallback adds further contention without an impact analysis.
+    required_correction: >-
+      Provide one authoritative mapping of each VM system disk, data disk, container
+      layer, artifact volume and scratch volume to physical storage, including the
+      lane-sharing fallback. Make that mapping satisfy the stated isolation rule
+      or revise the rule through an explicit justified decision with enforceable IO
+      protection. Recalculate failure blast radii and restore dependencies, and
+      verify stable-runtime latency under concurrent build and backup traffic.
+  - id: REVIEWER-EN-SE11-PHYSICAL-006
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07
+    source_or_requirement_id: SE11-REQ-06
+    description: >-
+      Section 8.3 specifies a NAS network UPS server and a matching Windows client
+      without identifying a supported protocol/client combination or its contract.
+      There is no behavior for loss of the NAS, switch or UPS signaling, no bounded
+      wait for a stuck VM or missing host-off acknowledgment, and no NAS shutdown
+      deadline. Waiting for low battery after host shutdown does not establish the
+      required 30 percent runtime reserve. The sole corrective action, reducing
+      network load, does not cover a shutdown budget that still exceeds runtime.
+    required_correction: >-
+      Specify a supported signaling integration with versioned compatibility evidence
+      or an explicitly gated alternative, and define bounded state transitions for
+      on-battery, early low-battery, communication loss, failed acknowledgments,
+      stuck guests, mains restoration and restart. Budget host and NAS shutdown
+      against measured remaining runtime with the required reserve. Define a
+      fail-closed commissioning outcome and architecture revision when the budget
+      cannot be met, and test signaling-path loss as well as mains loss.
+  - id: REVIEWER-EN-SE11-PHYSICAL-007
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-08
+    source_or_requirement_id: ENV-DEC-017
+    description: >-
+      Section 9 combines UPS-A failure and circuit-A failure and claims controlled
+      shutdown for both. An abrupt UPS output failure removes power from host, NAS
+      and switch together and cannot rely on that UPS for shutdown energy. Several
+      other common-mode domains, including FD-SWITCH, FD-INTERNET, FD-ROOM and
+      FD-EXT-AI, have no explicit accountable recovery/residual-risk owner. The
+      generic Stage 1-2 acceptance statement has no mapped availability or recovery
+      NFR and does not establish who owns these residual failures.
+    required_correction: >-
+      Separate mains/circuit interruption with a healthy UPS from abrupt UPS/output
+      loss and state the resulting crash-consistency and recovery requirements.
+      Assign an accountable owner, recovery dependency, measurable acceptance target
+      and residual-risk disposition to every common-mode domain, including external
+      dependencies and management signaling. Do not claim graceful shutdown for
+      failures that remove its power or communication path; validate the corresponding
+      abrupt-loss recovery behavior.
+  - id: REVIEWER-EN-SE11-PHYSICAL-008
+    severity: major
+    type: outline_gap
+    outline_id: QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03
+    source_or_requirement_id: SE11-AC-01
+    description: >-
+      Section 11.2 explicitly states that current manufacturer support, firmware
+      availability and practical availability have not been checked. Section 11.1
+      leaves simultaneous NIC/M.2 operation and exact memory support unresolved.
+      Nevertheless section 19 marks the current compatibility/availability criterion
+      covered on the basis of a future gate. A plan to obtain evidence is not the
+      required assessment, and structural comparisons copied from the BOM do not
+      establish a currently supported combination.
+    required_correction: >-
+      Record dated, attributable support and compatibility evidence for the adopted
+      combination, including BIOS/CPU, exact memory population, simultaneous slot
+      behavior, NIC/host support and practical availability. Where the allowed
+      corpus cannot establish a check, state it as not established, retain affected
+      items as conditional candidates, and identify the criterion as unmet rather
+      than covered. Separate pre-build support checks from commissioning tests and
+      bind any eventual verification/sign-off to the exact evidenced configuration.
+  - id: REVIEWER-EN-SE11-PHYSICAL-009
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05
+    source_or_requirement_id: SE11-REQ-03
+    description: >-
+      Section 6.1 requires every irreplaceable dataset to have a T3 copy, and
+      section 9 relies on T3 for NAS, room and site loss. Section 14 nevertheless
+      permits T3 evidence to wait until Stage 3, while sections 4 and 18 defer
+      isolated-copy implementation as the program matures. No rule prevents
+      irreplaceable data from being created before that copy exists, and no
+      bounded temporary recovery policy is defined. Thus the stated recovery
+      mitigations can be absent during the stages that claim to accept them.
+    required_correction: >-
+      Define one protection activation rule: require a verified isolated copy before
+      admitting irreplaceable datasets, or explicitly prohibit those datasets until
+      that capability is commissioned. Reconcile the acceptance stages, dataset
+      classification owner, copy interval/RPO, restore verification and failure-domain
+      residuals with that rule. Distinguish local T2-only recovery from recovery
+      that actually depends on an available, tested T3 copy.
