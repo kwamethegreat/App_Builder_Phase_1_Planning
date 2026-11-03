@@ -4,241 +4,237 @@ version: 2
 status: complete
 owner: REVIEWER_EN
 based_on: [SE11-PHYSICAL-INFRASTR-HARDWARE, SEED-01]
-requirements: [ENV-DEC-017, SE11-DEC-04, SE11-DEC-05, SE11-DEC-10a, SE11-DEC-11, SE11-DEC-14, SE11-DEC-15, SE11-ADR-01, SE11-ADR-02, SE11-REQ-05, SE11-REQ-06, SE11-REQ-11, SE11-NFR-01, SE11-NFR-04, SE11-NFR-05, ASM-SE11-01, ASM-SE11-04, ASM-SE11-06]
+requirements: [ENV-DEC-017, SE11-DEC-04, SE11-DEC-05, SE11-DEC-10a, SE11-DEC-11, SE11-DEC-14, SE11-DEC-15, SE11-ADR-01, SE11-ADR-02, SE11-REQ-05, SE11-REQ-06, SE11-REQ-11, SE11-NFR-01, SE11-NFR-04, SE11-NFR-06, ASM-SE11-01, ASM-SE11-04, ASM-SE11-06]
 ---
-run_id: 'SMK-20261103105206:SE11-PHYSICAL-INFRASTR-HARDWARE:review:1'
+run_id: SMK-20261103105206:SE11-PHYSICAL-INFRASTR-HARDWARE:review:1
 round_id: SMK-20261103105206
 task_id: SE11-PHYSICAL-INFRASTR-HARDWARE
 reviewed_version: 1
 reviewed_path: 50-Engineering-Domains/SE11/Outputs/_smoke/SMK-20261103105206/SE11-PHYSICAL-INFRASTR-HARDWARE.md
 verdict: revise
 review_scope:
-  document_class: physical_hardware_architecture
-  target_source: Full target supplied in run context.
+  target: Full target version 1 supplied in context.
   seed_verified:
     id: SEED-01
     version: Proposed Revision 1.1
     sha: 2d3a171d6961a8790f5a9812eeb1e3907f188242
-    sections_read: ['§160', '§227', '§228', '§238']
-  dependency_limit: >-
-    Required Stage-0, PM09, NT16, EL and SP16 documents are marked missing in the
-    context. Their absence is not evidence of compliance. No consistency with
-    unavailable EL architecture, upstream NFRs or controls is asserted.
-  plan_guidelines: Not applicable to this architecture document; no GL findings used.
-  prior_record: >-
-    The existing review was read for its required update SHA after the service
-    reported a write conflict. Findings 01–10 remain substantiated against the
-    unchanged target version and retain their identifiers. Finding 11 records the
-    additional explicit common-mode ownership gap.
+    sections_read: ['§160', '§227', '§238']
+  dependency_limit: Required Stage-0, PM09, NT16, EL and SP16 documents are marked missing. Their absence is not evidence of compliance; upstream requirement coverage and EL consistency cannot be certified.
+  plan_guidelines: Not a plan; GL outcome review does not apply.
+  prior_record: Existing review read for update SHA after a write conflict. Findings 01–11 remain substantiated against the unchanged target and retain their identifiers and classifications.
 summary: >-
-  The exact BOM version and material engineering dispositions are present, but the
-  signed baseline is not buildable. Capacity adoption lacks evidence, portability
-  is restricted contrary to the seed, compatibility is not established, and storage
-  acceptance contradicts the selected topology. Shutdown, recovery, network
-  prerequisites and cross-domain contracts remain incomplete.
+  Exact seed provenance, material BOM dispositions, resource pools and failure-domain
+  identifiers are present. The baseline is not ready for downstream implementation:
+  sizing and source authority are unsubstantiated, portability is restricted contrary
+  to the seed, and compatibility, shutdown, storage acceptance, recovery and consumed
+  contracts have material gaps.
 findings:
   - id: REVIEWER-EN-SE11-PHYSICAL-01
     type: source_gap
     severity: major
-    location: '§1.1; §15; §16.3'
+    location: '§1.1; §15 sign-off; §16.3 Conflicts'
     description: >-
-      The mandatory Stage-0 register is made not applicable because it is missing.
-      Section 16.3 incorrectly says no upstream dependency is listed despite the
-      task's required PM09, NT16, EL and SP16 dependencies. The document acknowledges
-      unresolved authority for proposed Rev 1.1, then signs off the baseline. Mapping
-      future register rows without changing dispositions prevents real reconciliation.
+      Missing Stage-0 coverage is marked not applicable, and §16.3 incorrectly says
+      no upstream dependency is listed despite the task's extensive required
+      dependencies. The document acknowledges that proposed Rev 1.1 lacks established
+      approval authority, then signs off an authoritative downstream baseline.
+      Mapping future register rows without changing dispositions prevents genuine
+      reconciliation. Missing sources do not establish compliance or approval.
     required_change: >-
       Correct the dependency inventory and distinguish unavailable from inapplicable.
-      Record the source-authority decision and reconcile dispositions against the
-      required register and architecture references. Until evidence exists, identify
-      the reference design as conditional and prohibit downstream implementation
-      freeze; do not assert approval or upstream consistency.
+      Record the source-authority decision and required consistency checks as evidence
+      gates. Until evidenced, identify the design as conditional and prohibit downstream
+      implementation freeze. Reconciliation must permit changes to dispositions rather
+      than merely attach new ids to existing conclusions.
   - id: REVIEWER-EN-SE11-PHYSICAL-02
     type: unsupported_addition
     severity: major
     location: '§4.1 SE11-DEC-04; §4.3; §5.1 SE11-DEC-14; §13.2 SE11-ADR-02'
     description: >-
-      The board-maximum 256 GB is adopted from assumed per-pool ranges without
-      workload counts, working sets or concurrency evidence. The stated 140–280 GB
-      total excludes the 15 percent reserve and its upper case exceeds installed
-      capacity. ADR-02 refuses reversal even if measurements show under-use. Six
-      20 TB NAS drives are justified as the minimum with useful capacity without a
-      retention/capacity calculation. This fails ENV-DEC-017 and SEED-01 §160/§238's
-      evidence-based provisioning requirement.
+      The maximum 256 GB host configuration is adopted from assumed pool ranges
+      without job counts, concurrency, measured working sets or a derivation from
+      workload requirements. The 140–280 GB total excludes the additional 15 percent
+      reserve, and the upper case exceeds installed memory. ADR-02 explicitly refuses
+      reversal if measured sizing shows under-use. Six 20 TB NAS drives are justified
+      as a minimum useful set without a retention/capacity model. This does not meet
+      ENV-DEC-017 or SEED-01 §160/§238 evidence-based provisioning requirements.
     required_change: >-
-      Derive a minimum safe configuration from a traceable workload, concurrency and
-      retention model, including reserves and admission/burst limits. Compare feasible
-      smaller/local/hosted options. Keep unevidenced sizes candidate rather than
-      adopted and allow measured sizing to reverse adoption.
+      Derive the minimum safe configuration from workload, retention and concurrency
+      evidence, including headroom and feasible reservations/admission limits. Compare
+      smaller and equivalent delivery configurations. Keep unevidenced sizes candidate
+      rather than adopted, and allow measurements to reverse the decision.
   - id: REVIEWER-EN-SE11-PHYSICAL-03
     type: dependency_inconsistency
     severity: major
     location: '§9.4; §13.2 SE11-ADR-01/08'
     description: >-
-      ADR-01 rejects all-hosted capacity as prohibited by the seed and requires a
-      seed amendment to reconsider it. ADR-08 describes the consumer AM5 reference
-      configuration as fixed. Verified SEED-01 §160 permits different greenfield
-      hardware, hosted capacity or hybrid delivery; §238 expressly permits managed
-      equivalents for central compute, NAS, power and worker infrastructure.
+      ADR-01 rejects all-hosted delivery as forbidden by the seed and requires a seed
+      change to reconsider it. ADR-08 treats the consumer AM5 reference configuration
+      as fixed. Verified SEED-01 §160 explicitly permits different greenfield hardware,
+      hosted capacity and hybrid delivery; §238 explicitly permits managed equivalents
+      for central compute, NAS, power and worker infrastructure.
     required_change: >-
-      Correct the ADR premises and evaluate alternatives against the same isolation,
-      performance, resilience, portability and governance outcomes. Justify any local
-      selection with platform evidence, not an invented source prohibition. Preserve
-      permitted placement changes without requiring a seed amendment.
+      Correct the ADR premises. Evaluate delivery classes against the same isolation,
+      performance, resilience, portability and governance outcomes. Justify local
+      selection with workload/economics evidence, not an invented source prohibition,
+      and preserve permitted placement changes without requiring a seed amendment.
   - id: REVIEWER-EN-SE11-PHYSICAL-04
     type: outline_gap
     severity: major
-    location: '§4.2; §10.1/10.2; §14 AC-01/02/09; §15 QC-AR-03'
+    location: '§3.1; §4.1/4.2; §10; §14 AC-01/02/09; §15 QC-AR-03'
     description: >-
       QC-AR-03 is marked covered although current manufacturer support, availability
-      and populated-system compatibility checks are future work. Nominal connector
-      and capacity matching is treated as compatibility evidence. The virtualization
-      row says coexistence validated although AC-09 is unexecuted. GPU assignment to
-      a Linux VM has no specified supported mechanism for the selected Windows 11
-      Pro/Hyper-V/board/driver combination, and no guest-device acceptance test.
-      Dedicated M2_4 access is ambiguous between disk pass-through, device assignment
-      and host-managed virtual disk, with different encryption/recovery implications.
+      and populated-system compatibility checks remain future work. Nominal connector
+      matching is not current support evidence. The matrix says virtualization
+      coexistence is validated without test evidence. GPU pass-through into a Linux VM
+      is committed without a supported assignment mechanism for the Windows 11 Pro,
+      Hyper-V, board, firmware and driver combination. Activation checks only clearance
+      and power. Dedicated M2_4 access is ambiguous between device/disk pass-through
+      and host-managed virtual disks, with different encryption and recovery behavior.
     required_change: >-
-      Separate nominal fit, inferred compatibility and verified support. Supply dated
-      evidence or retain unverified combinations as candidates behind a pre-freeze
-      gate. Specify and validate disk/GPU presentation, supported host/guest/firmware/
-      driver versions, isolation, reboot and recovery behavior. Remove unsupported
-      completed-validation claims.
+      Separate nominal fit, inferred compatibility and verified support; retain
+      unevidenced combinations as candidates behind a pre-freeze gate. Supply dated
+      support evidence and define/test supported storage and accelerator presentation,
+      host/guest versions, isolation, reset and recovery. Make these tests mandatory
+      before activation. Remove completed-validation claims not backed by evidence.
   - id: REVIEWER-EN-SE11-PHYSICAL-05
     type: downstream_unusable
     severity: major
     location: '§4.1 SE11-DEC-05/10a; §5.2; §14 AC-02/06; §16.4 NFR-01'
     description: >-
-      AC-06/NFR-01 require every drive to achieve at least 70 percent of rated
-      sequential speed, while §5.2 caps M2_3 at approximately 50 percent of that rating
-      because its slot is x2. Documenting x2 does not change the pass criterion. The
-      SATA scratch fallback must preserve every NFR, while AC-02 still requires M2_3
-      enumeration and AC-06 still applies the NVMe criterion. Neither branch has a
-      consistent acceptance path.
+      AC-06/NFR-01 require every drive to reach at least 70 percent of rated sequential
+      speed, but §5.2 expects M2_3 to deliver at most approximately 50 percent of the
+      drive rating because its slot is x2. No numerical slot-adjusted rating resolves
+      the conflict. The SATA scratch fallback must preserve every NFR, while AC-02
+      still requires M2_3 enumeration and AC-06 still applies the NVMe criterion.
+      Neither branch has a consistent acceptance path.
     required_change: >-
-      Define numeric read/write thresholds and test conditions by realized slot and
-      workload role, including explicit x2 and SATA branches. Select enumeration and
-      performance predicates by disposition. Demonstrate preservation of scratch
-      workload outcomes and record throughput/topology/test impacts of substitution.
+      Define role- and slot-specific numeric read/write thresholds, test conditions
+      and workload adequacy criteria. Select enumeration and performance predicates
+      according to the realized disposition, including x2 and SATA branches. Record
+      substitution throughput/topology/test impacts and demonstrate preserved outcomes;
+      otherwise prohibit the fallback under the unchanged-NFR substitution rule.
   - id: REVIEWER-EN-SE11-PHYSICAL-06
     type: downstream_unusable
     severity: major
-    location: '§7.1/7.4; §8 FD-UPS-A/FD-MGMT; §14 AC-08'
+    location: '§7.1/7.4; §9.4; §14 AC-08'
     description: >-
-      Shutdown names USB-HID and a NAS network-UPS function but no compatible host-to-
-      NAS protocol, coordinator, acknowledgement or timeout behavior. SEED-01 §228.1
-      describes a NAS network UPS server, not the asserted Windows-host completion-
-      signalling integration. The host signals shutdown complete before powering
-      off. Low runtime has no trigger threshold; a hung host, failed USB/link or
-      non-responsive VM has no bounded fallback. Twice the normal sequence duration
-      does not establish safety under those failures.
+      Shutdown names USB-HID and a NAS network-UPS function but no supported host-side
+      coordinator, interoperable protocol, acknowledgement or independent NAS trigger.
+      The host signals shutdown complete before powering off. Low runtime has no
+      threshold or budget; a hung VM/host, failed USB link or lost network message has
+      no bounded fallback. Twice the normal sequence duration does not establish safe
+      shutdown when the coordinator or communication path fails.
     required_change: >-
-      Specify or cite an owned supported coordination contract, power-backed control
-      path, trigger budget, bounded stage deadlines, completion acknowledgements and
-      independent NAS fallback. Distinguish final-write completion from host power-
-      off. Extend AC-08 to cover host/network/USB loss, hung participants, low battery
-      and restored mains with bounded expected results.
+      Specify or cite an owned supported coordination contract with server/client roles,
+      protected communication path, runtime trigger budget, bounded deadlines,
+      acknowledgements and timeout behavior. Distinguish final-write completion from
+      host power-off and provide independent NAS fallback. Extend AC-08 to test host,
+      USB and network loss, hung participants, low battery and restored mains.
   - id: REVIEWER-EN-SE11-PHYSICAL-07
     type: scope
     severity: major
     location: '§11; §15 Contract registration; §16.1/16.4'
     description: >-
-      Consumed storage, recovery, network, security and operations interfaces are
-      referenced only by role or generic design title, not contract id/version and
-      owner. RPO/RTO and security control ids remain future promises. The provided
-      contract is declared registered here while registration in the interface
-      document and EL register is future work. A local declaration does not establish
-      governed registration or make absent recovery/security contracts usable.
+      Consumed recovery, retention, network, security, telemetry and operations
+      interfaces are roles or generic future documents, not owner/versioned contract
+      ids. Security rows explicitly lack control ids and RPO/RTO remain future inputs.
+      The provided contract is declared registered here while registration in the
+      interface and EL registers is future work. A local declaration does not establish
+      governed registration or make unavailable consumed contracts buildable.
     required_change: >-
-      Identify each consumed contract by id, version and owner; map hardware NFRs and
-      controls to governing ids without copying another domain's schema. Cite actual
-      registration evidence for the provided contract. Treat unavailable inputs as
-      unfulfilled dependencies with explicit consumption gates, not implemented
+      Cite consumed contracts by id, version and owner, map NFR/security obligations to
+      governing ids, and cite registration evidence for the provided contract. Do not
+      invent another domain's contract or controls. Treat absent inputs as explicitly
+      identified unfulfilled dependencies with non-consumption gates, not implemented
       interfaces or completed traceability.
   - id: REVIEWER-EN-SE11-PHYSICAL-08
     type: downstream_unusable
     severity: major
-    location: '§5.1; §8 FD-NAS/FD-CIRCUIT-A; §14 acceptance gate; §16.2 ASM-SE11-04'
+    location: '§5.1; §8 FD-NAS/FD-CIRCUIT-A; §14 acceptance; §16.2 ASM-SE11-04'
     description: >-
-      ASM-SE11-04 promises an isolated/off-site copy before the first accepted stage
+      ASM-SE11-04 requires an isolated/off-site copy before the first accepted stage
       baseline, but no acceptance check establishes its existence, independence or
-      restorability. AC-10 restores from NAS and AC-12 restores a NAS backup to a
-      non-NAS host; neither proves survival of simultaneous host/NAS/site loss. The
-      baseline can pass while every copy remains in the shared power/site domain.
+      restorability. AC-10 and AC-12 restore from NAS; restoring to a non-NAS host does
+      not establish survival of simultaneous host/NAS/site loss. The baseline can pass
+      while every copy remains in the shared power/site failure domain.
     required_change: >-
-      Make isolated-copy establishment and restore verification mandatory acceptance
-      prerequisites. Cite an owned contract for protected classes, independent
-      placement, cadence, RPO/RTO and key/configuration recovery. Test with host and
-      NAS unavailable. If protection is deferred, constrain permitted data/use and
-      do not declare that stage baseline accepted.
+      Bind the independent-copy dependency to an owner/versioned storage contract and
+      make establishment and restore evidence mandatory at the ASM-SE11-04 acceptance
+      boundary. Define protected classes, cadence, data-loss/recovery bounds and key/
+      configuration recovery. Test with both host and NAS unavailable. If protection
+      is deferred, constrain permitted data/use instead of declaring the stage accepted.
   - id: REVIEWER-EN-SE11-PHYSICAL-09
     type: downstream_unusable
     severity: major
-    location: '§2.3; §6.1/6.2; §12.3 TRG-SWITCH/TRG-10GBE-SATURATION; §16.2 ASM-SE11-01'
+    location: '§2.3; §6.1/6.2; §12.3; §16.2 ASM-SE11-01'
     description: >-
-      The design presumes an existing gateway with at least 1 GbE ports, diagrams
-      5 GbE connections, proposes only 2.5 GbE when the assumption fails, and requires
-      verification of a 5 GbE path. Port count, segmentation and protected-power
-      readiness are not established. Management shares the north-south segment
-      without a defined enforcement contract. Direct host-link saturation triggers
-      adding a switch although the same single host link remains the bottleneck.
+      The greenfield topology presumes a gateway with at least 1 GbE ports, diagrams
+      5 GbE paths, specifies only 2.5 GbE if the assumption fails, and tests a 5 GbE
+      path. Port count, protected power and provisioning owner are not fixed.
+      Management shares the north-south segment without an enforcement contract.
+      Direct host-link saturation triggers adding a switch despite retaining the same
+      single 10GbE host path; §6.2 instead calls for architecture revision. NAS-side
+      aggregation also has no demonstrated effect on that host bottleneck.
     required_change: >-
-      Define an owned greenfield gateway dependency with consistent realized speed,
-      port count, management-isolation capability, power relationship and readiness
-      gate. Cite the network/security contract. Route host-link saturation directly
-      to a remedy or architecture review that changes path capacity or workload
-      traffic; separate endpoint expansion from throughput remediation.
+      Define an owned greenfield gateway prerequisite with consistent realized speed,
+      port count, power relationship, readiness gate and management-isolation contract.
+      Include negative reachability tests. Separate endpoint fan-out from throughput
+      remediation, and route saturation to an action that changes limiting host-path
+      capacity or workload demand, with measurable post-action success criteria.
   - id: REVIEWER-EN-SE11-PHYSICAL-10
     type: downstream_unusable
     severity: major
-    location: '§7.1/7.2/7.3; §14 AC-05/08'
+    location: '§7.1/7.2/7.3; §12.1; §14 AC-05/08'
     description: >-
-      The no-GPU component estimates sum to 240–350 W, not the stated 340–380 W;
-      adding 145 W yields 385–495 W, not 480–530 W. No loss or contingency allowance
-      reconciles the totals. PSU DC output and wall AC draw are not separated.
-      Gateway draw and NAS spin-up are omitted from the PD-A total. PD-B's budget
-      is its UPS rating rather than a load envelope with headroom.
+      Listed no-GPU component estimates sum to 240–350 W, not 340–380 W; adding 145 W
+      yields 385–495 W, not 480–530 W. No loss/contingency basis reconciles the totals.
+      PSU DC output and wall AC load are conflated, gateway load and NAS spin-up are
+      omitted, and PD-B uses its UPS rating rather than a load envelope. The GPU-case
+      PD-A estimate reaches 680 W, above the 600 W steady ceiling, while AC-05 enforces
+      only the 750 W peak ceiling. Claimed spare headroom has no consistent acceptance
+      calculation.
     required_change: >-
-      Recalculate auditable component/domain totals, separating DC demand, losses,
-      contingency and AC wall load. Include every protected load and transient
-      allowance with distinct steady/peak limits. Establish a bounded PD-B load
-      envelope before activation. Use the same configurations and measurement
-      boundaries in power and runtime acceptance.
+      Recalculate auditable DC/AC component and domain totals with explicit losses,
+      contingency, all protected loads and transients. Bound PD-B demand before
+      activation. Validate steady and peak ceilings and shutdown runtime for the same
+      worst-permitted configuration. Define GPU activation rejection or power-domain
+      revision on any failed envelope, and derive spare headroom from this budget.
   - id: REVIEWER-EN-SE11-PHYSICAL-11
     type: downstream_unusable
     severity: major
-    location: '§8 failure-domain table; §13.1 risk owners; §16.1'
+    location: '§8 failure domains; §13.1 risk owners; §16.1'
     description: >-
-      Failure domains are named but several common-mode domains have no explicit
-      accountable recovery owner: UPS/circuit/building-supply loss, shared rack/PDU
-      and site gateway loss. The risk table does not cover these domains, a qualified
-      electrician is only assigned circuit verification, and SE20's generic runbook
-      responsibility does not allocate mitigation or recovery accountability per
-      domain. ENV-DEC-017 requires common-mode failures to be owned, not merely named.
+      Common-mode UPS/circuit/building-supply, rack/PDU and gateway failures are named
+      but lack explicit accountable mitigation/recovery owners. The risk table does
+      not allocate these domains; the electrician only verifies circuits. Generic
+      SE20 runbook ownership does not assign recovery accountability across hardware,
+      network and facility boundaries. ENV-DEC-017 requires common-mode failures to
+      be owned, not merely listed.
     required_change: >-
-      Add an explicit FD-to-accountable-owner mapping, supporting owners and owned
-      mitigation/recovery contracts for every domain, including shared facility and
-      communication dependencies. Link each owner to the relevant acceptance and
-      fault-injection evidence.
+      Add a failure-domain-to-accountable-owner mapping with supporting owners and
+      owned mitigation/recovery interfaces, including shared facility and communication
+      dependencies. Link each assignment to the relevant acceptance/fault-injection
+      evidence and operational handoff.
 criteria_disposition:
-  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01: 'revise: 01; exact source identity is present'
-  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-02: 'revise: 09; physical scope otherwise explicit'
-  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03: 'covered: abstract pool allocation in §3; sizing deficiencies in 02'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01: 'revise: 01; exact source identity present'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-02: 'revise: 09; remaining physical scope explicit'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03: 'covered: abstract pool mapping in §3; sizing defect in 02'
   OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04: 'revise: 02, 04'
   OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05: 'revise: 02, 05, 08'
   OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-06: 'revise: 09'
   OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07: 'revise: 06, 10'
   OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-08: 'revise: 06, 08, 11'
-  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-09: 'covered: inventory, lifecycle, signals and maintenance in §9; integration gap in 07'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-09: 'covered: inventory, lifecycle, signals and maintenance in §9; interface defect in 07'
   OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-10: 'revise: 04'
   OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-11: 'revise: 07, 09'
   OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-12: 'revise: 02, 09'
-  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-13: 'revise: 03, 11; risk/ADR records are present'
-  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-14: 'revise: 04, 05, 06, 08'
-  QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01: 'covered: exact BOM revision/hash and material dispositions identified'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-13: 'revise: 03, 11; risk/ADR records present'
+  OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-14: 'revise: 04, 05, 06, 08, 10'
+  QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01: 'covered: exact BOM revision/hash and material dispositions present'
   QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-02: 'revise: 05, 06, 09, 10'
   QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03: 'revise: 04'
-  QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04: 'revise: 02, 08, 11; major device SPOFs are disclosed'
+  QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04: 'revise: 02, 08, 11; major device SPOFs disclosed'
   QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05: 'revise: 03, 05'
   QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-06: 'revise: 07, 08, 11'
   QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07: 'revise: 01, 07; exact version named but release authority unsubstantiated'
