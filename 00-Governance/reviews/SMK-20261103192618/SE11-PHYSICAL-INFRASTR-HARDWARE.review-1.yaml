@@ -1,0 +1,103 @@
+---
+id: SE11-PHYSICAL-INFRASTR-HARDWARE
+version: 2
+status: complete
+owner: REVIEWER_EN
+based_on: [SE11-PHYSICAL-INFRASTR-HARDWARE, SEED-01]
+requirements: [ENV-DEC-017, SE11-DEC-02, SE11-ADR-03, SE11-REQ-12, SE11-GATE-04, SE11-GATE-06, SE11-ADR-04]
+---
+run_id: SMK-20261103192618:SE11-PHYSICAL-INFRASTR-HARDWARE:review:1
+task_id: SE11-PHYSICAL-INFRASTR-HARDWARE
+reviewed_version: 1
+verdict: revise
+review_scope: >-
+  Smoke-run review of header, outline coverage, internal engineering consistency
+  and seed traceability. Missing upstream documents, contract registration and
+  external verification are exempt. All outline topics have explicit sections;
+  the findings concern correctable decisions within those sections, not absent
+  smoke-run dependencies. Seed sections checked directly were SEED-01 §162,
+  §227 and §228 at sha 2d3a171d6961a8790f5a9812eeb1e3907f188242.
+findings:
+  - id: REVIEWER_EN-SE11-PHYSICAL-01
+    severity: major
+    type: unsupported_addition
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04
+    source_or_requirement_id: SE11-DEC-02
+    description: >-
+      Section 4.3 adopts the maximum 256 GB configuration using the unmeasured
+      ASM-SE11-02 reservation ranges as workload justification. Section 4.6
+      explicitly labels those ranges assumptions, not evidence. GATE-03 checks
+      utilization only after installation and responds to low utilization by
+      downsizing the next node, so it cannot govern this baseline's sizing.
+      Avoiding a later kit qualification does not establish present workload
+      need. This violates the hardware-chain rule against maximum sizing
+      without workload evidence and SEED-01 §162's evidence-driven memory rule.
+    required_correction: >-
+      Make 256 GB a conditional reference target rather than a committed initial
+      capacity. Define a pre-adoption sizing gate using representative concurrent
+      workload demand, host overhead, reservations and headroom; let its outcome
+      select the initial supported memory class. Retain the assumed ranges as
+      planning inputs only and update B04, DEC-02, GATE-03 and expansion tables
+      consistently. No measurements need to be fabricated for this smoke run.
+  - id: REVIEWER_EN-SE11-PHYSICAL-02
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-08
+    source_or_requirement_id: SE11-ADR-03
+    description: >-
+      Sections 7.1 and 7.5 make the NAS and switch mandatory intermediaries for
+      host power-loss notification. Section 8 permits runtime to continue after
+      either NAS or switch loss, but specifies no autonomous action when UPS
+      telemetry becomes unavailable. The NAS failure workaround requires manual
+      USB re-patching; the switch workaround restores a data link, not the stated
+      MGMT notification path. A subsequent utility loss can therefore exhaust
+      UPS-A without host shutdown. AC-05 tests only the intact signalling chain,
+      leaving this common-mode shutdown dependency without an executable failure
+      policy or acceptance test.
+    required_correction: >-
+      Define and assign ownership of the host's fail-safe response to stale or
+      lost UPS-server communication, including a bounded timeout, local shutdown
+      behavior when the NAS is unavailable, and NAS shutdown behavior when host
+      acknowledgement is absent. Alternatively specify an independent verified
+      notification path. Record any timeout as a labelled assumption tied to
+      measured runtime and shutdown duration. Add NAS-loss and switch-loss plus
+      utility-loss cases to GATE-06/AC-05 and state the residual risk explicitly.
+  - id: REVIEWER_EN-SE11-PHYSICAL-03
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07
+    source_or_requirement_id: SE11-GATE-04
+    description: >-
+      The power acceptance procedure is internally inconsistent. Section 7.1
+      adds central-node DC load to other loads and compares the result directly
+      with the UPS output rating without accounting for PSU conversion. Sections
+      7.3 and 10.3 compare wall-input power with the PSU's 750 W output rating
+      without defining this as a conservative proxy or specifying a conversion.
+      GATE-04 also requires all-core plus GPU stress before GPU installation,
+      while B07 and RISK-07 prohibit installation until that gate passes. The
+      implementer cannot execute the stated sequence or consistently interpret
+      its headroom result.
+    required_correction: >-
+      Separate PSU DC-output budgeting from UPS AC-output loading, with explicit
+      measurement points and equations or a clearly labelled conservative proxy.
+      Split GPU admission into a pre-install analytical/compatibility check and
+      controlled installation for post-install stress validation before workload
+      admission. Re-run UPS runtime/shutdown validation for the changed load and
+      align GATE-04, GATE-06, B07 and RISK-07 with that executable sequence.
+  - id: REVIEWER_EN-SE11-PHYSICAL-04
+    severity: minor
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-06
+    source_or_requirement_id: SE11-ADR-04
+    description: >-
+      Section 6.2 requires L4 to operate at 5 GbE, but the minimum switch class
+      supplies only two 10GbE ports, both consumed by L1/L3, and 1/2.5GbE access
+      ports. L2 similarly lists no 1GbE fallback despite the class allowing it.
+      Sections 6.4 and 12.1 claim at least 20 spare access ports, although L1,
+      L2, L3, L4 and L6 consume five ports of a 24-port switch, leaving 19 total
+      spare ports for the minimum two-10GbE configuration.
+    required_correction: >-
+      Distinguish NIC capability from required negotiated link speed. Either
+      require matching 5GbE management ports or explicitly allow and validate
+      lower management-link speeds. Provide one reconciled port budget for the
+      minimum and preferred switch classes and correct the expansion headroom.
