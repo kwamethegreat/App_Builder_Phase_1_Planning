@@ -619,3 +619,197 @@ The owners of the control catalogue (SE17 for infrastructure/workload/data secur
 | SE11-SECREQ-06 Media sanitisation | NVMe and HDD sanitised on decommissioning/RMA; inventory record marks sanitised state | SE17 | SE11-AC-10 |
 | SE11-SECREQ-07 Supply chain at receipt | Serial numbers recorded; packaging/tamper evidence inspected; firmware version read and compared with the vendor's published current version before first power-on; default credentials on NAS, switch and UPS software rotated at commissioning | SE17 | SE11-AC-01 (pre-build), SE11-AC-10 |
 | SE11-SECREQ-08 Confidential-processing boundary | Private application/customer data is processed only by authorised locally hosted models or deterministic tools (§66); any local accelerator (B11) and the Data VM sit inside `seg.platform` behind the default-deny disclosure gateway on `seg.egress`; hardware telemetry export (§10.3) carries no workload content | SE17, EL | SE11-AC-05, SE11-AC-09 |
+
+## 14. Validation / evidence plan (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-14)
+
+Pre-build checks (AC-01, AC-11) are separate from commissioning tests (AC-02 … AC-14); commissioning never substitutes for the pre-build record (§11.3).
+
+| AC id | Check | Pass criterion | Evidence artefact | Executing owner | Needed before |
+|---|---|---|---|---|---|
+| SE11-AC-01 | **Pre-build** support, compatibility and availability evidence record (§11.3) | Every B1–B17 item has a dated, attributable record for each claim in §11.3; "not confirmed" items substituted per §11.4 with a new SE11-DEC or deferred; signalling candidate S-1/S-2 evidenced or S-3 adopted; receipt check (SE11-SECREQ-07) complete | Evidence record attached to the inventory; configuration fingerprint v0 | SE11 (SE20 assists at receipt) | Any build |
+| SE11-AC-11 | **Pre-build** reconciliation of this document to PL-REQ-ID-REGISTER rows and to EL/PM09/NT16/SP16 decisions once available (§0) | Every seed citation mapped to a register id; every ADR checked against EL ADRs; NFR values bound to EL/PM09 NFR ids or recorded as conflicts; status PROV → REC | Reconciliation table in SE11-PHYSICAL-INFRASTR-HARDWARE v3 | SE11, EL review | Baseline status above PROVISIONAL |
+| SE11-AC-02 | Slot, lane and mechanical verification | Negotiated PCIe width/speed for M2_1–M2_4 and PCI_E3 with all devices installed; M2_3/PCI_E3 coexistence confirmed or fallback mapping invoked (SE11-DEC-02); cooler/case clearance photos; GPU mechanical check when B11 is triggered | Link-state dump; inventory photos | SE11 | Stage 1 |
+| SE11-AC-03 | OS / virtualization enablement and reservation mechanism | Hyper-V operational with the four VMs at the §4 reserve/limit/weight and static/dynamic memory settings; admission rule (§5.2) encoded in version-controlled definitions; per-virtual-disk IOPS controls present or SE11-DEC-09 fallback recorded; NIC bound to the virtual switch at 10 Gb/s; Secure Boot + TPM reported enabled; GPU-to-VM path evaluated when triggered | Hypervisor and guest configuration export | SE11 with EL | Stage 1 |
+| SE11-AC-04 | Burn-in and performance baseline (SE11-NFR-08) | ≥ 24 h combined CPU/memory/NVMe stress with zero memory errors at the chosen DDR5 profile (fallback 5600/5200 per B4) at the selected population M-A/M-B; thermals within limits; NVMe sequential/random, per-virtual-disk and L1 throughput recorded as the measured replacement for §6.4 | Stress logs; telemetry export; baseline table | SE19 (executes), SE11 (accepts) | Stage 1 |
+| SE11-AC-05 | Network path and segmentation (SE11-NFR-02, SE11-SECREQ-03) | Host↔NAS ≥ 0.7 GB/s sustained 10 min under concurrent build-cache load; `seg.*` enforced; management plane unreachable from build/worker/egress segments | Throughput log; segmentation test log | SE11 (physical design/test), SE17 (policy), SE19 (measurement) | Stage 1 |
+| SE11-AC-12 | Contention and protected-floor test (SE11-NFR-01) | Profile: Build VM 100 % CPU + heavy IO on M2_2/M2_3, Validation VM 100 %, background saturating, T1→T2 backup transfer running on L1; Core probe p95 ≤ 1.5 × baseline, Data VM random-read p99 ≤ 2 × baseline, Highest-priority CPU-wait ≤ 5 %; observed throttling order background → build → validation | Load-test report with per-VM CPU share and per-virtual-disk latency | SE19 (executes), SE11 (accepts) | Stage 1 before stable-runtime baseline |
+| SE11-AC-06 | Power measurement and mains-loss drill (SE11-NFR-03; fail-closed §8.4) | Measured PD-A load (idle, typical, full stress, with/without GPU); measured runtime R at full-stress load; full mains-loss drill traverses S1 → S6 with every transition inside its bound and B ≤ 0.7 R; VMs and NAS return clean; electrician's sign-off of circuits A/B on file (SE11-REQ-10) | Power table; drill log with timestamps per state; professional sign-off reference | SE11 (measurement), SE20 (drill), qualified electrician (circuits) | Stage 1 before stable-runtime baseline |
+| SE11-AC-14 | Signalling-path-loss drill (FD-SIGNAL) | (a) USB/UPS-software path removed while on mains: alert ≤ 300 s; (b) NAS command path removed during S2: host completes its sequence inside B_host and the NAS follows its own fallback; (c) communication lost then mains lost: outcome recorded as abrupt loss and handled by SE11-AC-13 | Drill log | SE20 (drill), SE11 (accepts) | Stage 1 |
+| SE11-AC-13 | Abrupt-loss drill (FD-UPS-A, SE11-NFR-07) | UPS-A output removed under full contention profile; on restart every VM and host filesystem and the NAS array pass integrity checks with zero unrecoverable errors; database loss ≤ last committed transaction (SE12 verifies); scrub completes | Integrity-check logs; SE12 verification record | SE19/SE20 (drill), SE12 (data), SE11 (accepts) | Stage 1 before any D-IRR admission |
+| SE11-AC-07a | T1→T2 protection (`PL-T2`) | Snapshot + replication verified; restore of a VM and a database from T2 to a clean volume within SE11-NFR-05 (SE12's binding RTO if stricter); NAS single-drive pull with rebuild time recorded (replaces ASM-SE11-04) | Restore drill log; rebuild timing | SE12 (policy), SE19/SE20 (drill) | Stage 1 |
+| SE11-AC-07b | T3 protection (`PL-T3`) per D-IRR class | T3 mechanism commissioned; copy interval ≤ 24 h demonstrated; restore of each D-IRR class from T3 verified; T3 encryption and key recovery verified (SE11-SECREQ-05) | T3 inventory; restore log | SE12 (policy), SE17 (keys), SE20 (drill) | **Before the first D-IRR dataset of that class exists** (repositories: before local commissioning; databases/evidence: before non-synthetic data enters the Data VM) |
+| SE11-AC-08 | Security baseline of hardware | SE11-SECREQ-01 … 08 verified against the inventory ids; default credentials rotated; encryption active where required | Owner control evidence referencing inventory ids | SE17 (SE15 for keys/identity) | Stage 1 (host, NAS); full at Stage 3 |
+| SE11-AC-09 | Telemetry coverage (SE11-NFR-04) | Every §10.3 signal visible in SE20 monitoring with alert thresholds from §12.2 and the `PL-*` state | Dashboard/alert export | SE20 | Stage 1 |
+| SE11-AC-10 | Inventory and baseline sign-off | Inventory complete; configuration fingerprint recorded; no D-IRR data present in `PL-T2` mode; §17 record filled with evidence ids of AC-01 … AC-14; contract record (§18.2) updated | Signed baseline record | SE11 | Before downstream consumption as "VERIFIED" |
+
+Resilience tests beyond the above (fault injection on `pool.validate`, switch loss, NAS loss, provider loss, uplink loss) are specified and run by SE19 against the §9 domains; SE11 supplies the physical means (spare cables, drive-pull and power-cut procedures) and accepts the evidence.
+
+## 15. Exclusions (BND-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01 … AR-04)
+
+| Exclusion | Disposition in this document |
+|---|---|
+| BND-01 Purchase orders, price negotiation, vendor-selection scorecards, procurement workflow | Excluded. No prices, suppliers, order quantities or purchase approvals appear; part numbers are cited only as they appear in SEED-01 and alternatives are by specification class (§11.4). Nobody owns procurement in this chain. |
+| BND-02 Project-owned acquisition dates | Excluded. Only dependency windows are referenced ("Stage 1", "before the first D-IRR dataset"); no calendar dates. |
+| BND-03 Detailed software/container/service design owned by existing SE11 artefacts | Excluded. §4–§6 stop at pools, VM boundaries, hypervisor reservation controls and volume mapping; service design, images and pipelines are referenced to EL and SE11's runtime artefacts. The cgroup share defaults in §4 are budget boundaries, not service design. |
+| BND-04 Unverified assumptions presented as confirmed hardware facts | Complied with. Every non-seed figure is an engineering assumption (ASM-SE11-nn) or a validation gate (SE11-AC-nn); support, compatibility and availability are explicitly **not established** (§11.2); no vendor protocol compatibility is asserted (§8.3). |
+
+## 16. Architecture risks, decisions and ADRs (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-13)
+
+### 16.1 Architecture decision records (all PROV, §0.2)
+
+| ADR | Decision | Alternatives considered | Rationale |
+|---|---|---|---|
+| SE11-ADR-01 (rewritten) | The **candidate** physical architecture is one central node + durable NAS + elastic hosted-first worker pool. Each local element passes gate **G-LOCAL** before it is provisioned: workload evidence *and* economics justify it (§238), and no managed/hosted equivalent better satisfies the target requirements. Until G-LOCAL evidence exists (EL estimates, SE01 capacity, SP16 economics — all unavailable), every pool may be delivered locally or hosted | (a) Two-node local cluster from day one — rejected now: no measured need, violates no-overbuild (§158). (b) All-hosted — **not rejected**: it is the seed's acceptable equivalent (§238 "managed/hosted equivalents remain acceptable", §160 "must remain valid if the equivalent capacity is delivered by … hosted infrastructure, or a hybrid") and the fallback for FD-HOST/FD-ROOM; §66 favours local handling of confidential data but does not mandate local hardware | §160, §226, §238; v1's rejection of the hosted option contradicted §238 and is withdrawn |
+| SE11-ADR-02 | Windows 11 Pro host with Hyper-V Linux VMs for all durable services; WSL2 for interactive use only | Bare-metal Linux hypervisor — rejected: the seed fixes the preferred operating model (§166) and retains Windows for workstation/admin use (§227.9); portability is preserved at the VM/container-definition level (§168) | §166–§168 |
+| SE11-ADR-03 | Non-ECC DDR5 on the consumer AM5 platform accepted for the central node, monitored | ECC workstation/server class — recorded substitute if memory-error telemetry or data-integrity incidents attributable to memory occur (SE11-RISK-02) | §227.4; durable tier (NAS) is ECC (§228.1) |
+| SE11-ADR-04 | GPU deferred; adoption gated by §5.5 and TRG-GPU; accelerator class capped at single-slot ≤ 145 W within this architecture | Adopt at first build — rejected: §175/§177 make it optional and demand-driven; external providers are the default (§160) | §175–§177 |
+| SE11-ADR-05 | Host NVMe as independent volumes without RAID; NAS as durable/backup tier only; one-way replication T1 → T2 → T3 | Host NVMe mirroring — rejected (does not address FD-HOST; doubles cost); NAS as live VM datastore — rejected (§164: not a latency substitute; would make FD-STORAGE a hot-path SPOF) | §163, §164 |
+| SE11-ADR-06 (revised) | UPS signalling is a **gated** selection among S-1 (preferred), S-2 and S-3 (§8.3), decided by SE11-DEC-10 on pre-build evidence; shutdown order NAS-command → Build‖Validation → Core → Data → host | v1 chose S-2 (NAS as network UPS server) without compatibility evidence — demoted to a candidate, not rejected | §165, §228.1, §229.1 |
+| SE11-ADR-07 | Single managed switch, ≥ 2×10 GbE minimum (seed), ≥ 4×10 GbE preferred; interim point-to-point 10 GbE allowed as placement | Unmanaged switch — rejected (segmentation needs VLANs); dual redundant switches — rejected now (§166 "purchased incrementally from measured need") | §166, §230 |
+| SE11-ADR-08 (new) | Capacity **quantities** (memory kit, NAS drive count) are candidates governed by decision rules (§5.3, §6.7) and the seed's H.1/H.3 default to the smaller configuration; the maximum listed configuration is never adopted on the strength of this document | Adopt the seed's listed quantities as given — rejected: ENV-DEC-017 ("size from workload evidence, not to the maximum listed configuration"), §162, §238 | §158, §162, §234, §238 |
+| SE11-ADR-09 (new) | Storage mapping places Highest-priority VM disks on M2_4 and High/Medium VM disks + artifacts on M2_2 (§6.1), deviating from the BOM's literal role labels, with per-virtual-disk IOPS controls as defence in depth | Literal seed mapping (all VMs on M2_2) with IOPS controls only — rejected: puts Highest and Medium pools on one device, contrary to §157 and SE11-REQ-02; controls would be the sole protection | §157, §163 |
+
+### 16.2 Decisions (SE11-DEC-nn; all PROV)
+
+| Id | Decision | Impact |
+|---|---|---|
+| SE11-DEC-01 | B1 adopted with virtualization/IOMMU enabled and 230 W package limit as the compute power line | §8.2; SE11-AC-04 |
+| SE11-DEC-02 | B3/B5/B10 adopted with the PCI_E3–M2_3 lane-sharing constraint; fallback scratch on M2_2 (512 GB, IOPS-capped) if mutually exclusive | §6.1; SE11-AC-02 |
+| SE11-DEC-03 | B4 adopted as a specification class; quantity is a candidate (M-A/M-B/M-C) selected by the §5.3 rule in SE11-HARDWARE-CAPACITY-SIZING (recorded there as SE11-DEC-03a); 256 GB not adopted here | §5.3; SE11-RISK-02, SE11-RISK-10 |
+| SE11-DEC-04 | B7 adopted; GPU power conditional on SE11-AC-06; > 145 W class escalates | §5.5; REV-GPU-CLASS |
+| SE11-DEC-05 | B13 deferred to TRG-NAS-MEM | stock 16 GB ECC until telemetry justifies |
+| SE11-DEC-06 | B14 adopted as a drive class with RAID 6 mandatory; count is a candidate (N-A/N-B/N-C) selected by the §6.7 rule with SE12's retention model (recorded as SE11-DEC-06a); six drives not adopted here | §6.7; SE11-RISK-06, SE11-RISK-10 |
+| SE11-DEC-07 | Shutdown state machine, order and budget of §8.3 with the fail-closed outcome of §8.4 | SE11-REQ-06, SE11-NFR-03 |
+| SE11-DEC-08 | Switch adopted by class now; rack/PDU/trays/UPS-B/local workers deferred to TRG-WKR-LOCAL | §7.2, §8.1, §12.2 |
+| SE11-DEC-09 | Authoritative volume mapping of §6.1; Highest-priority VMs on M2_4; deviation from literal BOM role labels recorded with reason and impact; per-virtual-disk IOPS controls or, if unavailable, device separation alone | §6.1, §9 |
+| SE11-DEC-10 | UPS signalling topology gated: S-1 preferred, S-2 alternative, S-3 automatic fallback; none relied on before SE11-AC-01/06/14 | §8.3; SE11-RISK-11 |
+
+### 16.3 Requirements introduced by this document (SE11-REQ-nn; all PROV)
+
+| Id | Requirement | Verified by |
+|---|---|---|
+| SE11-REQ-01 | Hard reservations (static memory, 100 % processor reserve) for `pool.core`, `pool.data`, `pool.runtime`; every other pool has a declared floor/ceiling or an explicit shared-budget membership with a stated share | SE11-AC-03, SE11-AC-12 |
+| SE11-REQ-02 | No Highest-priority pool shares a physical NVMe device with a Medium-priority pool | SE11-AC-02/03 (mapping §6.1) |
+| SE11-REQ-03 | T0/T1 is never the sole copy of D-IRR or D-BND data; every T1 dataset has a T2 copy; every D-IRR dataset has a verified T3 copy | SE11-AC-07a/b |
+| SE11-REQ-04 | L1 sustains ≥ 0.7 GB/s host↔NAS under concurrent build-cache load; shared paths are not the first bottleneck | SE11-AC-05 |
+| SE11-REQ-05 | VM/container definitions carry no physical slot ids, serials or host names (portability §160) | SE11-AC-03 review |
+| SE11-REQ-06 | Shutdown budget B ≤ 0.7 × measured UPS-A runtime at measured load; every state transition bounded; fail-closed if unmet | SE11-AC-06, SE11-AC-14 |
+| SE11-REQ-07 | Inventory identity scheme, record fields and configuration fingerprint (§10.1, §11.3) for every asset and cable | SE11-AC-10 |
+| SE11-REQ-08 | Telemetry signals of §10.3 exported from first power-on | SE11-AC-09 |
+| SE11-REQ-09 | Firmware/driver lifecycle per §10.4 with snapshot + verified backup precondition | SE11-AC-08, SE20 |
+| SE11-REQ-10 | Electrical circuits A/B verified and, where needed, installed by a licensed electrician against §8.2 load figures; SE11 designs no electrical work | SE11-AC-06 sign-off reference |
+| SE11-REQ-11 | Downstream documents cite this document id **with its status (PROVISIONAL in v2)**, the B-id + disposition + quantity status they rely on, and the §9 failure-domain ids | EL review |
+| SE11-REQ-12 | Any substitution of a dispositioned item is recorded as a new SE11-DEC with technical reason and impact before use; silent substitution is prohibited | SE11-AC-10 |
+| SE11-REQ-13 | Protection activation: no D-IRR dataset may exist unless `PL-T3` is active for its class; `PL-T2` permits D-BND/D-REB only (§6.3) | SE11-AC-07b, SE11-AC-10 |
+| SE11-REQ-14 | Reservation mechanism: hypervisor processor reserve/limit/weight, static vs dynamic memory, per-virtual-disk IOPS controls, in-VM cgroup shares; admission rule of §5.2 | SE11-AC-03, SE11-AC-12 |
+
+### 16.4 Risks
+
+| Id | Risk | Likelihood / impact | Mitigation | Owner |
+|---|---|---|---|---|
+| SE11-RISK-01 | Single central host is the control-plane and data failure domain (FD-HOST, FD-NVME-M2_4) | Medium / High | SE11-REQ-05, T2/T3, hosted fallback (ADR-01), REV-HA | SE11, EL |
+| SE11-RISK-02 | Non-ECC host memory → silent corruption in the Data VM | Low / High | SE11-AC-04 memory pass; database checksums and backup verification (SE12); ECC class substitute (ADR-03) | SE11, SE12 |
+| SE11-RISK-03 | PCI_E3/M2_3 sharing reduces bandwidth or is mutually exclusive | Medium / Medium | SE11-AC-02; fallback mapping §6.1 | SE11 |
+| SE11-RISK-04 | No out-of-band management; a hung host needs physical presence | High / Medium | Physical console; SE20 auto-restart policy; REV-HA if SLOs require | SE11, SE20 |
+| SE11-RISK-05 | Support or availability of a BOM item has lapsed (BOM v2.2 is a point-in-time reference; nothing is established, §11.2) | **High** / Medium | SE11-AC-01 before any build; §11.4 classes; SE11-REQ-12 | SE11 |
+| SE11-RISK-06 | Long RAID 6 rebuild at 20 TB exposes the array to a third failure | Low / High | RAID 6; T3; rebuild timing measured (AC-07a); hot-spare option | SE12, SE11 |
+| SE11-RISK-07 | UPS-A runtime at measured load insufficient for the budget | Medium / High | Fail-closed §8.4 remedies; TRG-UPS-BATT | SE11, SE20 |
+| SE11-RISK-08 | Seed status: Rev 1.1 "proposed" while v1.0 "remains authoritative" (§0); hardware baseline could change on approval | Low / Medium | Sign-off bound to sha and revision; change control per §151/§104 re-enters this document | SE11, PL |
+| SE11-RISK-09 | Every required source and dependency was unavailable; reconciliation may change dispositions, NFRs or ADRs | **High** / Medium | All entries PROV; SE11-AC-11 gate; SE11-REQ-11 propagates provisional status | SE11, EL, PL |
+| SE11-RISK-10 | Capacity candidates must be chosen before a traceable model exists; H.1/H.3 default (M-A, N-A) may be undersized for Stage 1 or the later expansion may fail stability re-validation | Medium / Medium | §5.3/§6.7 rules; TRG-MEM-EXPAND, TRG-NAS-CAP; SE11-DEC-03a/06a record basis; M-C/N-C hosted equivalents | SE11, SE01, SE12 |
+| SE11-RISK-11 | No supported UPS signalling combination can be evidenced (S-1/S-2) | Medium / High | S-3 automatic fallback (two UPS, native USB each); no reliance before AC-06/14 | SE11 |
+
+### 16.5 Assumptions (explicit, labelled; corpus silent)
+
+| Id | Assumption | Resolution path |
+|---|---|---|
+| ASM-SE11-01 | PL-REQ-ID-REGISTER and fragments G01–G04 are absent; when present, their rows for §152–§177 and Appendices G/H map onto the citations here | SE11-AC-11; v3 adds register ids |
+| ASM-SE11-02 | SEED-01 Rev 1.1 is the operative seed despite its "proposed" status note | PL confirms; SE11-RISK-08 |
+| ASM-SE11-03 | Reservation envelopes in §4/§5.3 (floors, ceilings, host root need 2–4 LP) are hypothetical pre-measurement estimates derived from §156/§167 | Replaced by SE11-HARDWARE-CAPACITY-SIZING and measured p95 (§234) |
+| ASM-SE11-04 | RAID 6 rebuild at 20 TB under concurrent load: 1–3 days; N-A usable capacity ≈ 36.4 TiB derived from the seed's 80 TB → 72.8 TiB ratio | Measured in SE11-AC-07a |
+| ASM-SE11-05 | Device power envelopes in §8.2 are class estimates; the seed's ~560 W typical / 1,150–1,300 W peak remain the circuit-sizing figures | Measured in SE11-AC-06 |
+| ASM-SE11-06 | SE11-NFR-01 … 08 values are engineering proposals; product NFRs (PM09) and EL NFR ids are unavailable | Bound or corrected in SE11-AC-11 |
+| ASM-SE11-07 | FD-HOST recovery to degraded service ≤ 1 working day assumes a replacement host of the §11.4 class or hosted capacity is obtainable | SE20 spare/hosted readiness; SE19 resilience test |
+| ASM-SE11-08 | Dataset classification D-IRR/D-BND/D-REB and examples (§6.2) are a provisional default pending SE12 | SE12 document replaces |
+
+### 16.6 Conflicts
+
+**Not assessable in this version; no consistency with upstream documents is asserted.** v1's statement "No approved upstream document contradicts this architecture" is withdrawn: no upstream product, EL, NT16 or SP16 document was available to check (§0.1). What SE11-AC-11 must check and where a conflict would be recorded: product NFR/acceptance targets vs SE11-NFR-01 … 08; EL runtime/deployment/reliability decisions vs ADR-01/02/05/09 and the pool model; EL contract governance vs §18.2; SE12 data policy vs §6.2–§6.3 defaults; NT16 external-dependency assessment vs FD-EXT-AI/FD-INTERNET residuals; SP16 guardrails vs gate G-LOCAL. Known internal tensions, recorded rather than hidden: (1) §6.1 deviates from the BOM's literal role labels — justified in SE11-DEC-09/ADR-09; (2) the seed's own "proposed" status — SE11-RISK-08/ASM-SE11-02.
+
+## 17. Baseline sign-off record (QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07)
+
+| Field | Value |
+|---|---|
+| Baseline id | SE11-HW-BASELINE-2-PROV |
+| Bound to | SEED-01 Proposed Revision 1.1, Appendix G BOM v2.2, sections §74, §152–§177, §226–§238; file sha `2d3a171d6961a8790f5a9812eeb1e3907f188242` |
+| Configuration fingerprint | **None** — no evidenced configuration exists (SE11-AC-01 not performed, §11.2). The baseline is a set of dispositions by specification class plus capacity candidates, not a buildable bill |
+| Dispositions | Per §1.2 tally: ADOPT ×2; ADOPT WITH ENGINEERING CONSTRAINT ×13; DEFER / OPTIONAL ×5; SUBSTITUTE ×0; ESCALATE ×0 (conditional REV-*); capacity candidates: B4 quantity (M-A/M-B/M-C), B14 count (N-A/N-B/N-C); signalling candidates S-1/S-2/S-3 |
+| Status ladder | **PROVISIONAL** (this version) → RECONCILED (SE11-AC-11 passed: register ids attached, EL review recorded, conflicts resolved) → EVIDENCED (SE11-AC-01 passed: fingerprint v0 recorded) → VERIFIED (SE11-AC-02 … 14 evidence attached; SE11-AC-10 signed). Each step is recorded as a new version of this document and in the contract record (§18.2) |
+| Verification state | **DISPOSITIONED — PROVISIONAL — NOT APPROVED FOR DOWNSTREAM IMPLEMENTATION.** Downstream documents may cite the dispositions, pool ids, failure-domain ids, NFR proposals and candidate rules as *provisional* (SE11-REQ-11); nothing may be built, ordered or treated as verified on this version |
+| Provided contract | `SE11-CONTRACT-hardware-baseline@1` — **PROPOSED, defined in §18.2, not registered** |
+| Sign-off | SE11 (author): architecture dispositions complete at PROVISIONAL status, pending SE11-AC-11 and SE11-AC-01. EL review: **not performed** (documents unavailable). SE01/SE12/SE17/SE19/SE20 inputs: requested (§18.3), none received |
+
+## 18. Cross-domain dependencies and interface contracts
+
+### 18.1 Dependencies by owning role
+
+| Owning role (§74) | What is needed from / supplied to them | Artefact or contract | Needed by |
+|---|---|---|---|
+| EL | Reference this document (not duplicate) in system/runtime/deployment/reliability/estimate documents; bind services to pools (§4); review ADR-01 … 09; register the provided contract; accept FD-HOST/FD-EXT-AI residuals; include SE11-REQ-13 in Definition of Ready for data-bearing services | EL contract register; EL ADR record; EL DoR (all unavailable) | SE11-AC-11 |
+| PL | Register ids for the cited seed sections | PL-REQ-ID-REGISTER (unavailable) | SE11-AC-11 |
+| SE01 | Capacity model: F/C inputs for §5.3, queue-wait thresholds for TRG-WKR-LOCAL, replacement of ASM-SE11-03 | Requested contract (§18.3) | SE11-DEC-03a; Stage 1 end |
+| SE12 | Dataset classification (replaces ASM-SE11-08), retention volume V for §6.7, binding RPO/RTO, backup schedule, T3 medium/provider policy, abrupt-loss integrity verification, key custody with SE17 | Requested contract (§18.3) | SE11-DEC-06a; SE11-AC-07a/b; SE11-AC-13 |
+| SE14 | Portable naming/addressing conventions for pools and segments (no physical design) | Consultation | Stage 1 |
+| SE15 / SE17 | Control ids for SE11-SECREQ-01 … 08; segmentation policy between `seg.*`; key custody; SE11-AC-08 evidence | Requested contract (§18.3) | Stage 1 (host/NAS), Stage 3 (full) |
+| SE19 | Execute SE11-AC-04/05/12/13 and the §9 resilience tests | Requested contract (§18.3) | Stage 1–2 |
+| SE20 | Telemetry integration (SE11-AC-09), maintenance windows, firmware execution, drills SE11-AC-06/13/14, inventory upkeep, admission checklist for SE11-REQ-13 | Requested contract (§18.3) | Stage 1 |
+| SP16 | Economics input for gate G-LOCAL (ADR-01) | SP16 guardrails (unavailable) | Before any local provisioning decision |
+| NT16 | External-provider and hosted-equivalent risk/SLA input for FD-EXT-AI, FD-INTERNET, N-C/M-C, T3 provider | NT16 assessments (unavailable) | Before T3 provider and hosted-equivalent decisions |
+| SE11 (own) | SE11-HARDWARE-CAPACITY-SIZING (applies §5.3/§6.7 rules; records SE11-DEC-03a/06a) and SE11-POWER-COOLING-RACK (thermal, rack layout, PD details) | Sibling SE11 documents | Stage 1 |
+| Qualified electrician | Circuits A/B verification and any installation (SE11-REQ-10) | Professional sign-off referenced from SE11-AC-06 | Before stable-runtime baseline |
+
+### 18.2 Provided contract — definition of record (status PROPOSED)
+
+`SE11-CONTRACT-hardware-baseline@1` · owner SE11 · **status: PROPOSED — defined by this section; not registered.** Registration requires SE11's Interface Contract document and EL's contract register (EL-INTERFAC-CONTRACT-GOVERNAN), neither of which is available; until registration the contract is cited as "proposed in SE11-PHYSICAL-INFRASTR-HARDWARE v2 §18.2". Content per asset: the §10.1 inventory fields; disposition, quantity status and candidate selected (§1.2, §5.3, §6.7); failure-domain ids (§9); pool ids and budgets (§4); volume mapping (§6.1); protection level `PL-*` (§6.3); signalling topology S-x (§8.3); baseline status (§17 ladder); evidence ids (§14); configuration fingerprint (§11.3). Compatibility rule: additive fields only within major version 1; any change to a disposition, mapping, budget rule or status ladder is a new major version. Consumers (EL runtime/deployment/reliability/estimate documents, SE01, SE12, SE14, SE17, SE19, SE20, Stage-14 plans) cite this contract and the status they rely on; they never restate hardware facts.
+
+### 18.3 Consumed interfaces — requested, none yet registered
+
+No owner has published a contract id in this run (§0.1). SE11 therefore records each consumed interface as **REQUESTED**, names the owner and the expected naming pattern, and does not invent an id. Until the owner assigns the id, the dependency is **unmet** and the dependent SE11 decision stays PROV.
+
+| Consumed interface (requested) | Owner | Expected id pattern (assigned by owner) | SE11 decision that depends on it |
+|---|---|---|---|
+| Capacity model inputs F/C and queue-wait thresholds | SE01 | `SE01-CONTRACT-<slug>@n` | SE11-DEC-03a, TRG-WKR-LOCAL |
+| Dataset classification, retention volume V, binding RPO/RTO, T3 policy | SE12 | `SE12-CONTRACT-<slug>@n` | SE11-DEC-06a, SE11-REQ-13, SE11-NFR-05 |
+| Security control ids for SE11-SECREQ-01 … 08; segmentation policy | SE17 (SE15 for identity/keys) | `SE17-CONTRACT-<slug>@n`, `SE15-CONTRACT-<slug>@n` | §13, SE11-AC-08 |
+| Test execution and evidence format for SE11-AC-04/05/12/13 | SE19 | `SE19-CONTRACT-<slug>@n` | §14 |
+| Telemetry ingestion, alerting, maintenance calendar, drill execution | SE20 | `SE20-CONTRACT-<slug>@n` | SE11-AC-06/09/14, §10.5 |
+| NFR ids, ADR ids, contract register entry, DoR clause for SE11-REQ-13 | EL | EL register entries | §3, §16.1, §18.2 |
+
+## 19. Criteria disposition
+
+| Criterion | Disposition | Where / reason |
+|---|---|---|
+| OUT-…-AR-01 source baseline | Covered | §1.1 (Rev 1.1, BOM v2.2, sha), §1.2 (B1–B19 with class/quantity separation) |
+| OUT-…-AR-02 scope and boundaries | Covered | §2 (physical network retained by SE11 per §74) |
+| OUT-…-AR-03 workload allocation | Covered | §4 (pools, budgets, shared-budget membership) |
+| OUT-…-AR-04 compute | Covered | §5 (normalised accounting, reservation mechanism, memory candidates and rule, GPU preconditions) |
+| OUT-…-AR-05 storage | Covered | §6 (authoritative mapping, classes, protection rule, recovery split, NAS candidates) |
+| OUT-…-AR-06 network | Covered | §7 |
+| OUT-…-AR-07 power/placement | Covered | §8 (gated signalling, state machine, budget, fail-closed) |
+| OUT-…-AR-08 failure domains | Covered | §9 (FD-CIRCUIT-A vs FD-UPS-A; owners, targets, residuals) |
+| OUT-…-AR-09 manageability | Covered | §10 |
+| OUT-…-AR-10 compatibility/availability assessment | Covered | §11 — the assessment is performed and its result is "not established" for support/availability; structural checks and alternatives by class recorded |
+| OUT-…-AR-11 security | Covered | §13 (SE11-SECREQ-nn) |
+| OUT-…-AR-12 expansion | Covered | §12 |
+| OUT-…-AR-13 risks/ADRs | Covered | §16 |
+| OUT-…-AR-14 validation plan | Covered | §14 |
+| QC-…-AR-01 exact source version; every item dispositioned | Covered | §1.1, §1.2 (status PROVISIONAL) |
+| QC-…-AR-02 one coherent physical architecture | Covered | §2.3, §4–§10 cross-referenced by pool, device, segment, power-domain, failure-domain and protection-level ids |
+| QC-…-AR-03 compatibility and availability checked sufficiently | **not_applicable (recorded as UNMET)** — the allowed corpus cannot establish current support, compatibility or availability for any item (§11.2); the criterion is reported as unmet, every item stays a conditional candidate, and the baseline is PROVISIONAL with no fingerprint; closure requires SE11-AC-01 | §11.2–§11.3, §17 |
+| QC-…-AR-04 no hidden SPOF, capacity limit or dependency | Covered | §9 (incl. FD-NVME-M2_1/M2_4, FD-UPS-A, FD-SIGNAL, FD-MGMT), §12.1 hard ceilings, §12.3, §16.4 |
+| QC-…-AR-05 substitution rules preserve assumptions | Covered | §11.4 classes; SE11-REQ-12; §12.3 ESCALATE boundaries; §8.4 ordered remedies |
+| QC-…-AR-06 validation evidence and affected owners explicit | Covered | §14 (owner and gate per AC), §18 (owners, requested contracts) |
+| QC-…-AR-07 sign-off against the exact baseline consumed downstream | Covered | §17 (provisional sign-off bound to seed sha; status ladder; no fingerprint claimed) |
+| BND-01 … BND-04 | Covered (excluded as required) | §15 |
+
+Required source PL-REQ-ID-REGISTER: reported `not_applicable` in the event for the mechanical reason in §0.3; substantive disposition **UNAVAILABLE SOURCE / LIMITATION** (§0.1), closure by SE11-AC-11.
