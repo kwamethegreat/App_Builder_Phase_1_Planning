@@ -1,0 +1,9 @@
+run_id: SMK-20261103105206
+state: FAILED_PROVIDER
+finished_at: 2026-11-03T11:15:24.816Z
+compiled_plan_commit: null
+task_counts:
+  FAILED_PROVIDER: 1
+failed_tasks:
+  - {task: SE11-PHYSICAL-INFRASTR-HARDWARE, status: FAILED_PROVIDER, review_cycles: 0, error: "invalid review: finding REVIEWER-EN-SE11-PHYSICAL-01 incomplete; finding REVIEWER-EN-SE11-PHYSICAL-02 incomplete; finding REVIEWER-EN-SE11-PHYSICAL-03 incomplete; finding REVIEWER-EN-SE11-PHYSICAL-04 incomplete; finding REVIEWER-EN-SE11-PHYSICAL-05 incomplete; finding REVIEWER-EN-SE11-PHYSICAL-06 incomplete; finding REVIEWER-EN-SE11-PHYSICAL-07 incomplete; finding REVIEWER-EN-SE11-PHYSICAL-08 incomplete; finding REVIEWER-EN-SE11-PHYSICAL-09 incomplete; finding REVIEWER-EN-SE11-PHYSICAL-10 incomplete; finding REVIEWER-EN-SE11-PHYSICAL-11 incomplete", log: 00-Governance/run/SMK-20261103105206/failures/SE11-PHYSICAL-INFRASTR-HARDWARE.failure.md}
+blocked_tasks: []
