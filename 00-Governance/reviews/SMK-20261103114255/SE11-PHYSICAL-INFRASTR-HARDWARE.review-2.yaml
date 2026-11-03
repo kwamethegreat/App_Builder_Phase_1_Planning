@@ -1,0 +1,181 @@
+---
+id: SE11-PHYSICAL-INFRASTR-HARDWARE
+version: 3
+status: complete
+owner: REVIEWER_EN
+based_on: [SE11-PHYSICAL-INFRASTR-HARDWARE, SEED-01]
+requirements: [ENV-DEC-017, SE11-REQ-01, SE11-REQ-06, SE11-REQ-13, SE11-REQ-14, SE11-DEC-03, SE11-DEC-09, SE11-NFR-01, SE11-NFR-05]
+---
+run_id: SMK-20261103114255:SE11-PHYSICAL-INFRASTR-HARDWARE:review:2
+task_id: SE11-PHYSICAL-INFRASTR-HARDWARE
+reviewed_version: 2
+verdict: revise
+review_basis:
+  - The target v2 was supplied in full. Required upstream documents are explicitly missing in the context; their consistency cannot be verified.
+  - SEED-01 sections §227, §164 and §157 were independently read; the returned seed sha matches the target's cited sha.
+  - Prior finding references below follow the target's v1-review disposition table. The original review itself was not supplied.
+assessment: >-
+  Exact seed provenance, BOM disposition coverage, the corrected primary volume mapping,
+  and explicit ownership of abrupt versus controlled power-loss domains are improvements.
+  Provisional labels correctly withdraw unsupported verification claims, but do not close
+  required source, contract or compatibility checks. The revised allocation, fallback,
+  shutdown and protection rules still contain implementation-significant contradictions.
+findings:
+  - id: REVIEWER-EN-SE11-PHYSICAL-001
+    severity: major
+    type: source_gap
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01
+    source_or_requirement_id: PL-REQ-ID-REGISTER
+    description: >-
+      The substantive gap remains open. Sections 0.1, 0.2, 16.6 and 17 confirm that no
+      register requirements or required upstream decisions have been reconciled, and no
+      architecture decision is REC. Sections 0.3 and 19 nevertheless classify the applicable
+      required register as not_applicable. Missing evidence is not inapplicability. The
+      limitations are now honest, but a future AC-11 is not evidence of current source
+      coverage or EL consistency.
+    required_correction: >-
+      Remove the not_applicable interpretation and retain an explicit unmet-source
+      disposition. Complete the register mapping and required upstream consistency checks
+      using available authoritative inputs before claiming this baseline satisfies review;
+      record actual conflicts and their dispositions. Do not fabricate ids, approvals or
+      availability. If the inputs remain absent, preserve the restriction on implementation
+      and do not describe the source gap as resolved.
+  - id: REVIEWER-EN-SE11-PHYSICAL-002
+    severity: major
+    type: unsupported_addition
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04
+    source_or_requirement_id: ENV-DEC-017
+    description: >-
+      Downgrading 256 GB to a candidate does not remove the maximum-sizing bypass.
+      Section 5.3 directs selection of M-B when a single Stage-1 component exceeds 32 GB,
+      even if the aggregate F/C model does not exist. A component exceeding the proposed
+      Data VM allocation does not establish that 128 GB is insufficient or that the
+      board-maximum 256 GB is justified. This contradicts the section's own prohibition
+      on adopting 256 GB on its strength alone and the workload-based sizing rule.
+    required_correction: >-
+      Remove the automatic greater-than-32-GB-to-M-B rule. Require an aggregate concurrent
+      workload/reservation calculation, including host overhead and headroom, before
+      choosing the maximum configuration. Specify how a larger component is accommodated
+      by reallocating the smaller candidate or using a hosted alternative, and record
+      why those alternatives fail before choosing M-B.
+  - id: REVIEWER-EN-SE11-PHYSICAL-003
+    severity: major
+    type: dependency_inconsistency
+    outline_id: QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-06
+    source_or_requirement_id: EL-INTERFAC-CONTRACT-GOVERNAN
+    description: >-
+      Sections 18.2 and 18.3 explicitly leave the provided hardware contract unregistered
+      and every consumed interface without an assigned contract id. Dependent requirements
+      nevertheless rely on capacity inputs, retention/RPO policy, security controls,
+      telemetry and validation supplied through those interfaces. REQUESTED naming patterns
+      and a PROPOSED local definition do not satisfy contract discipline. The revision
+      fixes false registration claims, not the missing contracts.
+    required_correction: >-
+      Bind each consumed interface to its owner-issued contract id/version and register
+      the provided contract through the authorized SE11/EL contract artifacts. Reconcile
+      the dependent decisions, NFR mappings and security-control references to those
+      contracts. Until that evidence exists, identify these as unmet dependencies rather
+      than completed contract coverage; do not invent owner contracts or registration.
+  - id: REVIEWER-EN-SE11-PHYSICAL-004
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04
+    source_or_requirement_id: SE11-REQ-14
+    description: >-
+      The M-A settings cannot be implemented unambiguously. Section 4 gives Validation
+      and Build maxima of 24 and 32 GB, yielding a 136 GB aggregate ceiling with the
+      stated host/WSL/Core/Data allocations. Section 5.3 instead uses 20 and 20 GB and
+      reports a 120 GB ceiling. Its 104 GB floor also requires 130 GB under its own
+      capacity >= 1.25 F rule, so the mandatory 128 GB default fails that rule. Separately,
+      sections 4 and 5.2 claim a deterministic shedding order from relative weights
+      without defining a shedding controller or transitions; AC-12 cannot establish
+      which specified behavior an implementation must implement.
+    required_correction: >-
+      Publish one authoritative per-candidate reservation table and derive all totals
+      and admission checks from it. Resolve the M-A headroom violation without silently
+      bypassing the sizing rule. Distinguish weighted contention from ordered load shedding;
+      either specify the latter's signals, actions, owner and recovery behavior or change
+      the claims and AC-12 to measurable weighted-service guarantees that preserve the
+      seed's runtime and critical-validation protection outcome.
+  - id: REVIEWER-EN-SE11-PHYSICAL-005
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05
+    source_or_requirement_id: SE11-DEC-09
+    description: >-
+      The primary Core/Data mapping is now consistent, but its fallback is not a complete
+      resource-protection design. Section 5.4 permits storage QoS to be absent and relies
+      on device separation alone. Section 6.1 still puts High-priority Validation and
+      Medium-priority Build on M2_2, and moves scratch there on the lane-sharing fallback.
+      That row incorrectly calls the resulting contention Build-internal only. No
+      alternative limiter protects Validation if QoS is unavailable, and even the normal
+      path supplies no IOPS limits or rule for deriving them. AC-12 measures Core/Data,
+      not the critical-validation storage outcome.
+    required_correction: >-
+      Define supported storage limits or an alternative placement/admission mechanism
+      for Validation versus Build for every allowed combination of lane coexistence and
+      QoS availability. Correct the fallback impact to include Validation. Supply limits
+      or a decidable sizing/calibration rule and a contention acceptance check for
+      critical-validation I/O; disallow fallback combinations that cannot preserve it.
+  - id: REVIEWER-EN-SE11-PHYSICAL-006
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07
+    source_or_requirement_id: SE11-REQ-06
+    description: >-
+      Section 8.3's default shutdown bound is understated. Its sequential VM and host
+      timeouts total 270 seconds before the NAS acknowledgment wait/retry, which can
+      add 30 seconds; nevertheless B_host is 270 seconds and B is 360 seconds. S3 also
+      describes up to 120 seconds of NAS shutdown after host-off while the budget assumes
+      NAS shutdown completes in parallel. The common state machine does not establish
+      separate runtime bounds for the independently powered S-3 NAS. Restart is incomplete:
+      mains restoration during S2 is deliberately not an abort, but S5 accepts restoration
+      only in S3/S4 and relies on AC-power recovery. If mains returns before UPS output
+      drops, no specified mechanism powers the subsequently halted devices back on.
+    required_correction: >-
+      Specify a candidate-specific timed sequence with explicit concurrent versus serial
+      actions, bounded retries and remaining-runtime requirements for every UPS. Recompute
+      B and the required runtime from the actual critical path. Define a supported restart
+      mechanism for restoration during S2 and for restoration without an output power
+      cycle; do not assume firmware AC-recovery alone handles these cases. Add these
+      scenarios and the independent NAS-runtime case to AC-06/14 with pass criteria.
+  - id: REVIEWER-EN-SE11-PHYSICAL-008
+    severity: major
+    type: outline_gap
+    outline_id: QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03
+    source_or_requirement_id: SE11-AC-01
+    description: >-
+      Sections 11.2, 17 and 19 explicitly establish that current support, compatibility
+      and practical availability have not been checked, that there is no evidenced
+      configuration fingerprint, and that the result is not a buildable combination.
+      QC-AR-03 is applicable but marked not_applicable (UNMET). Structural comparison
+      and a future evidence plan do not fulfill this criterion. Prior finding 008
+      remains substantively open despite withdrawal of the earlier verification claim.
+    required_correction: >-
+      Supply attributable current support/compatibility/availability evidence for the
+      adopted combination and bind the disposition baseline to the resulting exact
+      configuration. Substitute or defer unconfirmed components with recorded impacts.
+      Keep commissioning tests distinct from these pre-build checks. Until the evidence
+      exists, record QC-AR-03 as unmet, not inapplicable, and do not claim criterion closure
+      or implementation-ready sign-off.
+  - id: REVIEWER-EN-SE11-PHYSICAL-009
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-08
+    source_or_requirement_id: SE11-REQ-13
+    description: >-
+      The new protection activation rule leaves contradictory degraded-operation behavior.
+      Section 6.3(6) downgrades to PL-T2 on loss of the T3 mechanism while existing D-IRR
+      remains, but sections 6.3(2), 6.6, 9 and AC-10 rely on the invariant that no D-IRR
+      exists in PL-T2. No rule says whether writes to existing databases must stop.
+      FD-INTERNET also promises that any outage shorter than 24 hours preserves the
+      24-hour T3 interval, ignoring the age of the last successful copy when the outage
+      starts. Consequently consumers cannot derive admission, recovery exposure or
+      a valid acceptance result for a common failure scenario.
+    required_correction: >-
+      Define separate unprotected-initial and degraded-protection states, with per-class
+      last-successful recoverable-copy timestamps, maximum copy age and explicit creation
+      and mutation permissions. Define actions when protection expires, how existing
+      D-IRR is handled and how protection is restored. Reconcile the invariants, failure
+      table and AC-10 to those states. Base outage tolerance on remaining copy-age budget,
+      not outage duration alone, and test expiry during an internet/T3 failure.
