@@ -15,24 +15,26 @@ input to engineering and to other domains; ambiguity here becomes wrong software
   Contradictions you discover go under "Conflicts" with both citations.
 - Specialist domains (SP01–SP22) and reverse-validation: if your document's subject matches an active specialist trigger
   (see `applicability.json`), include the required validation hooks the workflow's Appendix F/G specify for your family.
-- Applicability decision (SP13 only): follow `applicability-rules.md` exactly; the table format is machine-checked.
+- Applicability decision (SP13 only): follow `applicability-rules.md` exactly; the table format is machine-checked. You
+  decide from the Stage-0 package (register + PL documents); evidence cites PL document ids and requirement ids.
+- Product Lead at Stage 0 (ENV-DEC-020): nothing in the seeds may be lost, and no call holds more than one seed group.
+  - A **register fragment** (`PL-REQ-REGISTER-Gnn`): your context holds one seed group whole and the section ids you must
+    dispose. Extract — do not narrate — every requirement, decision and constraint as a row with the **full specification**
+    (statement, values, thresholds, conditions, acceptance terms; never a summary) and its seed section (`SEED-08 §4.2`);
+    group rows under `##` sections by source area. Under `## Appendices`, carry every table, decision tree, threshold list
+    and the hardware strategy/BOM **verbatim**, one `### A<n> — SEED-nn §a.b` each; rows that rest on the data cite the
+    appendix. Your `## Seed coverage` table disposes every section of the group as `carried` (rows/appendix), `merged`
+    (into which section) or `excluded` (reason; "out of scope" needs a seed citation); the completion event repeats it as
+    `"seed_coverage": {"SEED-08 §4.2": "carried", …}`. The machine rejects an undisposed section, a word outside the
+    vocabulary, a `carried` section no row or appendix cites. Your reviewer holds the same seeds and checks substance.
+  - The **register** (`PL-REQ-ID-REGISTER`): your context holds the four fragments whole, never the seeds. Merge their rows
+    into one register — specifications carried over unchanged, duplicates merged with the surviving id and the merged id
+    listed under `## Superseded ids`, `## Decisions` and `## Constraints and guardrails` as cross-cutting sections, the
+    other sections headed by PL source area. No appendices: a row that needs its data cites the fragment section
+    (`PL-REQ-REGISTER-G02 §A3`). Your `## Seed coverage` table and `seed_coverage` event cover every section of every seed
+    and must repeat the fragments' dispositions exactly (the machine compares them).
+  - The **ten Stage-0 documents**: your context holds SEED-01 whole (the master vision) and the register; cite register ids
+    for every requirement and read a fragment or seed section on demand when you need its exact wording or data.
 - Evidence: quality, freshness, source authority and uncertainty are stated where they could change the decision.
 - Design/UX documents describe behaviour, structure and evidence, not visual polish; visual design belongs to DX01,
   behaviour and research to UX01, product intent to the PM.
-- Hardware planning chain (ENV-DEC-017): the Master Product Vision seed is the canonical hardware strategy/BOM and SE11
-  turns it into physical architecture, sizing and physical design (`SE11-PHYSICAL-INFRASTR-HARDWARE`,
-  `SE11-HARDWARE-CAPACITY-SIZING`, `SE11-POWER-COOLING-RACK`). Nobody copies the BOM into another document.
-  - PL: Stage-0 documents identify the seed sections and version that carry the hardware strategy/BOM as the canonical
-    upstream source (not a procurement list); the Greenfield Baseline records whether local hardware is an adopted input,
-    optional capacity, external dependency or changed constraint; constraints that depend on hardware get stable ids.
-    Review an engineering substitution only if it changes scope, an approved constraint, risk posture, portability, cost
-    guardrails or VP commitments.
-  - PM09: state runtime/infrastructure outcomes, NFR targets and acceptance outcomes that the SE11 documents must
-    support — never component models or brands; accept technical substitutions that keep requirements satisfied.
-  - NT16: supply vendor, availability, lifecycle, warranty, support and lead-time facts by reference to SE11's
-    specification classes; never choose architecture, override sizing or make price the design criterion.
-  - SP16: supply cost/TCO guardrails and cost-to-capacity comparisons that cite `SE11-PHYSICAL-INFRASTR-HARDWARE` /
-    `SE11-HARDWARE-CAPACITY-SIZING`; never own sizing or force a technically inadequate option.
-  - PJL: consume, never redesign — physical prerequisites (562), staged capacity (563), installation/power/network
-    readiness (564); record availability/lead-time dependencies, facility/electrical validation prerequisites, hardware
-    readiness → build/validation dependencies and the contingency if a component class becomes unavailable.

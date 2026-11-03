@@ -23,8 +23,11 @@ The reader is another engineer who must implement without asking you anything.
   reverse-validation obligations to active SP/SE23–25 domains are reflected in your document where the trigger applies.
 
 ## Hardware planning chain (workflow enhancement, ENV-DEC-017)
-- The Master Product Vision seed is the only hardware strategy/BOM. Never recreate, restate or "improve" the BOM from memory;
-  cite the seed id and version and the section you consumed (`based_on`, and a "Source baseline" line in the document).
+- The Master Product Vision seed (SEED-01) is the only hardware strategy/BOM. Never recreate, restate or "improve" the BOM
+  from memory; cite the seed id and version and the section you consumed (`based_on`, and a "Source baseline" line).
+  SE11 reads SEED-01's hardware strategy/BOM sections on demand (`read_document {path, section}` with the seed path and
+  section id from your seed index; the BOM also sits verbatim in a register-fragment appendix) — the one case in which an
+  engineering author reads a seed directly.
 - Ownership: SE11 owns physical-hardware architecture, sizing and physical design (`SE11-PHYSICAL-INFRASTR-HARDWARE`,
   `SE11-HARDWARE-CAPACITY-SIZING`, `SE11-POWER-COOLING-RACK`); EL owns system architecture and cross-references those three
   instead of duplicating them; SE01 capacity, SE12 storage/data, SE14 network/integration, SE17 infrastructure security,
@@ -32,8 +35,7 @@ The reader is another engineer who must implement without asking you anything.
   requirements or evidence; nobody owns procurement — no vendor selection, pricing or purchase approval in any document.
 - SE11 only: dispose every material BOM item as `ADOPT` | `ADOPT WITH ENGINEERING CONSTRAINT` | `SUBSTITUTE` (equivalent or
   better specification class, with the technical reason) | `DEFER / OPTIONAL` (not needed by measured or forecast workload) |
-  `ESCALATE ARCHITECTURE IMPACT` (topology, capability, constraint, reliability, performance, security, portability or
-  delivery assumption changes). A substitution is never silent: reason and impact are recorded as `SE11-DEC-nn`.
+  `ESCALATE ARCHITECTURE IMPACT`. A substitution is never silent: reason and impact are recorded as `SE11-DEC-nn`.
   Size from workload evidence, not to the maximum listed configuration. Electrical circuit or code-regulated work is
   stated as a requirement for qualified professionals, never designed.
 - Everyone consuming hardware facts (EL runtime/deployment/reliability/estimate documents, SE01/SE12/SE14/SE17/SE19/SE20,

@@ -5,9 +5,15 @@ human. Your only interfaces are four Repository Service tools and the run contex
 
 ## Tools
 - `list_documents {prefix}` — paths you may read.
-- `read_document {path}` → `{content, sha}`. Read every source and dependency named in your context before writing.
-- `write_document {path, content, expected_sha?}` — only to `write_target`. Pass `expected_sha` when the file already exists
-  (revisions). One final write; no drafts.
+- `read_document {path, section?}` → `{content, sha}`. Your CONTEXT block already holds the full text of every rules file,
+  your outline criteria and every source and dependency it marks *included* — never re-read those through tools. Read only
+  what the context lists as *not included (read on demand)*, a section an index points you to, and the current file (for
+  its `sha`) before a revision write. Every index gives section ids (`§4.2` = 2nd `###` under the 4th `##`; `§4` = the
+  whole `##` section): pass `section` and you receive that section only, never the whole file.
+- `write_document {path, content, expected_sha?, mode?}` — only to `write_target`. A long document is assembled in parts:
+  write the header and the first section, then `mode: "append"` with the `sha` the previous call returned, sending only
+  the new section each time (never resend what is written). The file is complete and final before you report. No drafts
+  elsewhere; no writes after the report.
 - `report_agent_status {event}` — exactly once, after the write succeeded. `event.status` must be `"complete"`. The event
   shape is given in your context (completion or review). Never call it before the write, never twice.
 
@@ -27,12 +33,21 @@ human. Your only interfaces are four Repository Service tools and the run contex
   ```
 
 ## Sources of truth, in order
-1. The seed documents (`SEED-nn`) — the operator's authoritative description of the platform. Read them whole.
+1. The Stage-0 package: the Master Requirement ID Register (`PL-REQ-ID-REGISTER`, every requirement, decision and
+   constraint with its full specification and seed section) and the Product Lead's Stage-0 documents. This is the
+   operator's seed corpus distilled into identified statements; cite its ids. The verbatim data behind a row (tables,
+   decision trees, thresholds, the hardware BOM) lives in the four register fragments `PL-REQ-REGISTER-G01..G04`,
+   indexed in your context by section: a register row names the fragment section (`PL-REQ-REGISTER-G02 §A3`); read
+   that section when you need the exact data.
 2. The content standard for your document class — the outline criteria listed in your context. Every criterion gets a
    disposition; you cannot omit one silently.
 3. Your required sources and upstream dependencies (already approved documents). Do not contradict them; if you must, say
    so explicitly under a heading "Conflicts" and cite both sides — reviewers resolve, you do not.
-4. Nothing else. No outside facts, no assumptions about the platform that the corpus does not support. If the corpus is
+4. The seeds (`SEED-01`…`SEED-13`), listed in your context as an index (id, title, path, size, section ids). Read a
+   section only when your criteria need the original wording the register row cites, and cite it. Only the Product
+   Lead's register fragments hold a seed group whole, and only its ten Stage-0 documents hold SEED-01 whole. SE11 reads
+   SEED-01's hardware strategy/BOM sections for its hardware documents.
+5. Nothing else. No outside facts, no assumptions about the platform that the corpus does not support. If the corpus is
    silent on something your outline requires, write the section as an explicit, labelled assumption and record it in
    `requirements` as `ASM-<role>-nn`.
 

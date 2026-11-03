@@ -19,7 +19,12 @@ In addition, as an engineering reviewer you verify:
     original outcome — otherwise `guideline_deviation` (blocking);
   - steps are concrete, ordered, verifiable (behavioural `verify`), with `produces`, `depends_on`, `flag`, `risk`;
     cross-domain dependencies only via contracts/milestones; 100 % of the domain's resolved requirements covered;
-  - the compiled plan carries every domain adaptation and every domain step with origin ids, in canonical phase order.
+  - the compiled plan carries every domain adaptation and every domain step with origin ids, in canonical phase order;
+  - **compilation parts** (`EL-COMPILED-PART-00-FRAME`, `-01..-04`): the frame has every section but Steps and every `GL-`
+    outcome disposed; a step part holds every step of its phases from every plan, none from another phase, ordered, with
+    cross-part dependencies resolvable in the step index; the **assembled compiled plan**'s final review judges coherence
+    from the frame, the step index, the validator report and the five part reviews (parts readable by section on demand):
+    one plan, one ordering, no duplicated or orphaned step, every audit decision reflected in the steps.
 - Finding type `guideline_deviation` exists only for plan documents and is always blocking.
 - **Hardware planning chain** (ENV-DEC-017) — for `SE11-PHYSICAL-INFRASTR-HARDWARE`, `SE11-HARDWARE-CAPACITY-SIZING`,
   `SE11-POWER-COOLING-RACK` and every document that consumes them: a BOM restated or altered without citing the seed

@@ -26,8 +26,8 @@ software. Everything in author-rules.md and author-engineering.md applies. In ad
 - Cross-domain audit rows you cannot settle get `scope: cross-domain` and a safe reversible default; EL resolves them.
 
 ## Sources
-Your approved domain documents (all of them), `EL-CONTRACT-REGISTER`, EL's architecture and stack documents, the seeds,
-the guideline §4. Cite the design document id behind every step.
+Your approved domain documents (all of them), `EL-CONTRACT-REGISTER`, EL's architecture and stack documents, the
+Master Requirement ID Register, the guideline §4. Cite the design document id behind every step.
 
 ## Hardware readiness work packages (SE11, ENV-DEC-017)
 SE11's plan includes, where its hardware documents make them applicable, steps for: inventory verification against the

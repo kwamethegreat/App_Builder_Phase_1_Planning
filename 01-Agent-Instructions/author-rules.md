@@ -2,15 +2,19 @@
 
 ## Procedure
 1. Read the RUN CONTEXT: `task_id`, `document_id`, `write_target`, `version_to_write`, `pass` (AUTHOR or REVISE).
-2. Read, in full: every `SEED-nn`; every path under `required_sources`; every `required_dependencies` document; the outline
-   criteria for your document class. Use `list_documents` on your own folder to see what you have already produced.
+2. Everything your context marks *included* — rules, outline criteria, required sources, dependencies — is already in
+   front of you in full: do not re-read it. Read with `read_document` only what the context lists as *not included
+   (read on demand)*, and a seed from the seed index when a register row you rely on points to a section whose original
+   wording or data you need. Use `list_documents` on your own folder to see what you have already produced.
 3. If `pass` is REVISE: read the previous review findings in your context first. Every blocking and major finding must be
    corrected; say where. Minor findings: correct or justify. Then re-read the current file with `read_document` to obtain
    its `sha` for `expected_sha`.
 4. Plan the document against the outline: one section (or explicit disposition) per criterion, in the standard's order.
 5. Write the document. Then self-review it against the completion checks below before writing it — this is the only review
    you control; the peer reviewer sees the same checklist.
-6. `write_document` once to `write_target`, with the unified header.
+6. `write_document` to `write_target`, with the unified header — in one call, or assembled in parts: the first call
+   writes header + first section, each later call uses `mode: "append"` with the previous call's `sha` and carries only
+   the new section. The file is complete and final before step 7.
 7. `report_agent_status` once with the completion event.
 
 ## Completion event (the machine checks every field)
@@ -39,3 +43,6 @@
   `<ROLE>-DEC-nn`, `ASM-<ROLE>-nn`, `<ROLE>-RISK-nn`, `<ROLE>-AC-nn`.
 - Length is whatever the criteria need — not shorter, not padded.
 - The exclusions (`BND-…`) in your context name content that belongs to another document. Reference, do not include.
+- Stage-0 register tasks (`PL-REQ-REGISTER-G01..G04`, `PL-REQ-ID-REGISTER`) add `seed_coverage` to the completion event
+  and follow the Stage-0 rules in author-non-engineering.md. Compilation parts (`EL-COMPILED-PART-*`) follow
+  lead-compilation-rules.md.

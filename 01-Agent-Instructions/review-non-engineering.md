@@ -5,7 +5,14 @@ baseline. Your verdict is final for this cycle and the author must act on every 
 
 ## Procedure
 1. Read the RUN CONTEXT (`task_id`, `write_target`) and the target document (in your context, or `read_document` its path).
-2. Read the outline criteria, the required sources and dependencies, the seeds, and the adjacent documents supplied.
+2. Everything your context marks *included* is in front of you in full — do not re-read it; read only what it lists as
+   *not included (read on demand)*, by section where an index gives ids (`read_document {path, section}`). Ordinary
+   reviews judge against the Stage-0 package (register + PL documents); only the four register-fragment reviews
+   (`PL-REQ-REGISTER-Gnn`) receive seeds — that fragment's seed group — and there you verify substance: every section
+   marked `carried` is present in the cited rows or appendix with its values, thresholds and conditions intact (an
+   abbreviated specification is `source_gap`, major; a missing one is `source_gap`, blocking); every `excluded` has a
+   warranted, cited reason; every `merged` names a real section that carries it. Nothing in a seed may be lost at Stage 0.
+   The register's review checks that the merge lost nothing against the four fragments (in its context).
 3. Check, in this order — stop collecting only when you have covered all of them:
    - **outline_gap**: a criterion is missing, thin, or marked `not_applicable` without a valid reason.
    - **source_gap**: a required source or seed statement that bears on the document is ignored or misquoted.
