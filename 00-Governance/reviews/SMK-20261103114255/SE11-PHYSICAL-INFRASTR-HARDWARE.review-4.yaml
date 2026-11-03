@@ -1,0 +1,171 @@
+---
+id: SE11-PHYSICAL-INFRASTR-HARDWARE
+version: 5
+status: complete
+owner: REVIEWER_EN
+based_on: [SE11-PHYSICAL-INFRASTR-HARDWARE, SEED-01]
+requirements: [ENV-DEC-017, SE11-DEP-01, SE11-DEP-02, SE11-DEP-04, SE11-DEP-05, SE11-DEP-11, SE11-REQ-03, SE11-REQ-13, SE11-REQ-15, SE11-REQ-17, SE11-REQ-18, SE11-REQ-20, SE11-NFR-03, SE11-AC-01, SE11-AC-07b, SE11-AC-07d, SE11-AC-09, SE11-AC-11, SE11-AC-15]
+---
+run_id: SMK-20261103114255:SE11-PHYSICAL-INFRASTR-HARDWARE:review:4
+round_id: SMK-20261103114255
+task_id: SE11-PHYSICAL-INFRASTR-HARDWARE
+reviewed_version: 4
+verdict: revise
+summary: >-
+  The revision does not close the required-source, compatibility-evidence or
+  contract-governance gaps. Its revised restart and protection-bootstrap paths
+  still contain execution deadlocks or contradictory admission conditions.
+  The newly specified event protocol also fails during healthy idle operation
+  and does not define a recoverable cursor across host epochs. The provisional
+  label and implementation prohibition disclose these limitations but do not
+  satisfy the document's completion or engineering acceptance criteria.
+findings:
+  - id: REVIEWER-EN-SE11-PHYSICAL-001
+    severity: major
+    type: source_gap
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01
+    source_or_requirement_id: PL-REQ-ID-REGISTER
+    description: >-
+      Retained. Sections 0.1, 0.3, 0.5, 17 and 19 explicitly leave the required
+      register unconsumed, every register mapping UNMET, and all decisions
+      unreconciled. Changing the reported source coverage from covered to
+      not_applicable does not resolve this applicable required-source gap.
+      The supplied context confirms the missing source; the reviewer cannot
+      establish Stage-0 requirement coverage or authoritative decision alignment.
+      This remains a partial architecture, not a source-complete deliverable.
+    required_correction: >-
+      Reconcile the hardware dispositions, assumptions, requirements and decisions
+      against the actual PL-REQ-ID-REGISTER and cite its applicable IDs, preserving
+      the exact seed/BOM version references. Reconcile the required upstream
+      product and EL decisions and record any conflicts. Do not fabricate missing
+      sources or IDs, and do not classify an applicable unmet source as not
+      applicable. Disclosure of absence must not be represented as closure; this
+      finding remains open until the authoritative inputs and reconciliation exist.
+  - id: REVIEWER-EN-SE11-PHYSICAL-003
+    severity: major
+    type: dependency_inconsistency
+    outline_id: QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-06
+    source_or_requirement_id: SE11-DEP-11
+    description: >-
+      Retained. Section 18.2 still provides two normative interfaces with
+      REGISTRATION PENDING status, and section 18.3 replaces consumed owner
+      contracts with unaccepted placed requirements. Naming SE12 as the
+      write-freeze owner does not supply its enforcement contract; equivalent
+      gaps remain for KEYS custody/admission, scheduler behavior and owner
+      security controls. The producer interface for supplying copy/restore
+      verification and custody facts to SE11's protection-state publisher is
+      also not identified. A transcription template and dependency labels do
+      not meet the requirement that provided contracts be registered and
+      consumed interfaces cite owner contract IDs.
+    required_correction: >-
+      Reference actual registration entries for both provided contracts in the
+      owning SE11 and EL artifacts. Cite owner-issued, versioned contracts for
+      every consumed behavior and authoritative protection-state input, including
+      copy/restore results, custody readiness, creation admission and write-freeze
+      enforcement. Bind security requirements to the owning control IDs and
+      document the accepted producer/consumer responsibility split. Do not treat
+      assignments or pending registration as integration acceptance, and do not
+      invent absent owner contracts.
+  - id: REVIEWER-EN-SE11-PHYSICAL-006
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07
+    source_or_requirement_id: SE11-REQ-20
+    description: >-
+      The revised section 8.3 still cannot restart every combination it admits.
+      Under S-2 the NAS is the UPS server and is shut down. Under M3 the host
+      reads UPS status before sending N1 to wake the NAS; an unreadable UPS
+      causes shutdown and re-arming instead. With mains restored and UPS
+      outputs still energized, the NAS stays off, every poll remains unknown,
+      and the battery need never exhaust. M3 plus N1 is nevertheless admitted
+      for any candidate and assigned a 720-second bound. Separately, the
+      full-service bound of 15 minutes adds only the 180-second VM ladder,
+      excluding S6's possible 300-second NAS wait and unbounded integrity checks.
+    required_correction: >-
+      Define an admissibility matrix for signalling and restart combinations.
+      Either disallow S-2/M3 or provide a bounded sequence that wakes the NAS
+      and establishes its UPS-server readiness before requiring UPS status,
+      without starting workloads on an unknown power state. Recompute
+      end-to-end timing from mains restoration through actual service readiness,
+      including NAS startup/wait and integrity-check outcomes. Extend AC-15
+      with S-2/M3, NAS initially off, mains restored without an output cycle,
+      and sufficient battery charge; require both devices and the services to
+      reach the stated terminal state within the applicable bound.
+  - id: REVIEWER-EN-SE11-PHYSICAL-008
+    severity: major
+    type: outline_gap
+    outline_id: QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03
+    source_or_requirement_id: SE11-AC-01
+    description: >-
+      Retained. Sections 11.2, 11.3 and 17 confirm that no dated support or
+      availability evidence, coherent supported configuration, or fingerprint
+      exists. Deferring part numbers and enumerating FC-01 through FC-09 are
+      not the required compatibility/availability check; reporting this
+      applicable quality criterion as not_applicable remains incorrect.
+      The proposed closure gate is also circular: AC-01 is required before any
+      build and fingerprint v0 before purchase, yet AC-01 requires receipt
+      checks and permits feasibility closure using post-build AC-02/03/04/15
+      results, while section 11.3 says commissioning never substitutes for
+      the pre-build record.
+    required_correction: >-
+      Supply attributable, dated evidence for at least one coherent supported
+      configuration or evidenced in-class alternative, and record its exact
+      baseline selection and availability assessment. Split documentary
+      feasibility/selection, receipt verification and commissioning into
+      ordered gates with achievable prerequisites; do not require a test on
+      built hardware to authorize that hardware's build. Keep the quality
+      criterion explicitly unmet until the evidence exists rather than
+      disposing it as not applicable. A future evidence plan alone does not
+      close this finding.
+  - id: REVIEWER-EN-SE11-PHYSICAL-009
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05
+    source_or_requirement_id: SE11-REQ-13
+    description: >-
+      The revised protection bootstrap still has no execution satisfying all
+      its invariants. Section 6.3 defines PL-0 as admitting only synthetic/D-REB
+      data and PL-T2 as containing no real D-IRR data. AC-07d nevertheless
+      creates real REPO data in step 1 before AC-07a and then claims PL-T2 in
+      step 2. REPO is expressly D-IRR, not an excluded external class. In
+      addition, REQ-03 requires every real D-IRR class to have a verified T3
+      copy, contradicting the admitted ANCHOR period without that copy.
+      Recurring mechanism verification is also inconsistent: section 6.3
+      requires stage-gate fixture verification, but AC-07b requires that no
+      real dataset of that class exist when the test runs.
+    required_correction: >-
+      Define one non-circular bootstrap and platform-state derivation that
+      accounts for the real REPO data needed to hold commissioning evidence.
+      If an independently protected bootstrap repository is outside the local
+      admission scope, state that boundary explicitly and define its later
+      incorporation; otherwise reorder the gates consistently. Reconcile
+      REQ-03 with ANCHOR exposure and the T2/T3 protection invariants. Separate
+      initial mechanism admission from recurring fixture verification so
+      existing real datasets do not make the next stage gate impossible.
+      Rewrite AC-07d as a trace in which every intermediate state satisfies
+      every applicable invariant, without exemptions or implicit exclusions.
+  - id: REVIEWER-EN-SE11-PHYSICAL-010
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-09
+    source_or_requirement_id: SE11-CONTRACT-hardware-signals@1
+    description: >-
+      The newly normative section 18.2 event protocol is internally
+      inconsistent. It emits level HEARTBEATs every 300 seconds but requires
+      consumers to mark all levels STALE after 180 seconds without one;
+      healthy idle operation therefore repeatedly prohibits real-data
+      admission. It resets seq per boot epoch but accepts only since=seq,
+      with no epoch parameter or reset response. A consumer holding an old
+      high sequence can receive no new-epoch event and thus cannot detect
+      the epoch change it is instructed to handle. No retained-history
+      boundary or current-level snapshot recovery is specified.
+    required_correction: >-
+      Choose compatible heartbeat, polling and stale-detection bounds with
+      an explicit delay margin. Specify an epoch-aware cursor or a globally
+      persistent sequence, deterministic responses for an obsolete cursor
+      or lost history, retention bounds, and an authoritative current-level
+      snapshot/replay procedure. Define initialization of all protection
+      levels before consumers admit writes. Add AC-09 cases for healthy
+      idle operation across multiple heartbeat intervals, reboot with a
+      high saved cursor, and expired history; require no false STALE state
+      during healthy operation and bounded recovery without lost transitions.
