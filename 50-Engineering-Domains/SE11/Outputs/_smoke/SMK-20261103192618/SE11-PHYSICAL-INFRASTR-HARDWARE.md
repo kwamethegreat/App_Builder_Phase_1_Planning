@@ -518,3 +518,171 @@ Health status is a single composite per failure domain (§8) exposed to the plat
 
 - Remote management capability: Windows host (RDP/WinRM over MGMT VLAN), Hyper-V management, NAS web console, switch console — all on MGMT VLAN; no BMC/IPMI exists on the consumer-class board (SEED-01 §227.3 lists none). Consequence (FD-MGMT): a host that fails to boot requires physical presence. Expansion item (§12): an IP-KVM class device with remote power control, adopted when measured incidents show physical-presence recovery is on the critical path.
 - Maintenance-window classes: **Full-platform** (host reboot; all pools down; requires VMs saved, backups current, POOL-C-VAL not inside a VP-validation window), **Network-only** and **Durable-tier-only** (both require the SE11-REQ-16 maintenance hold on the host UPS client for the window's duration, logged), **Pool-local**. SE20 schedules; SE11 supplies the class per component (table in §9.2). Because the host is a single point of failure, Full-platform windows are the dominant availability cost of the baseline and are minimized by batching BIOS/NVMe/OS updates.
+
+## 10. Compatibility and availability assessment (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-10)
+
+### 10.1 What can and cannot be verified in this run
+
+Current manufacturer support, firmware status, retail availability and board-revision behaviour are facts outside the corpus and cannot be verified in a documentation run. SE11 therefore (a) checks the BOM for **internal** compatibility using only the specifications SEED-01 states, (b) records every external fact as an evidence gate with owner, stage and failure consequence, and (c) records alternatives by specification class so that a failed gate never stalls the build on a procurement question (BND-…-AR-04).
+
+### 10.2 Internal compatibility check (from seed-stated specifications only)
+
+| Check | Items | Result from stated specs | Residual uncertainty → gate |
+|---|---|---|---|
+| Socket / chipset | B01 AM5 ↔ B03 AM5 X870 | Compatible | BIOS version supporting the CPU at delivery → SE11-GATE-01 |
+| Cooler height vs chassis | B02 157 mm ↔ B08 ~166 mm | 9 mm margin — fits | DIMM clearance under towers → SE11-GATE-07 |
+| Cooler mounting | B02 AM4/AM5 kit included | Compatible | — |
+| Memory | B04 class M128 (2×64 GB) or M256 (4×64 GB) DDR5 UDIMM ↔ B03 "4 DDR5 DIMM up to 256 GB" | Both classes inside the board maximum; M256 is the maximum; EXPO step-down rule provided by seed | Class selection → SE11-GATE-10; two-/four-DIMM stability, QVL status → SE11-GATE-03 |
+| M.2 population | 4 drives ↔ 4 slots | Fits; two sharing relations stated by the seed (M2_2/USB4, M2_3/PCI_E3) | Exact sharing behaviour → SE11-GATE-02 |
+| NIC slot | B10 PCIe 3.0 x4 ↔ PCI_E3 PCIe 4.0 x4 (shared) | Electrically compatible; bandwidth sufficient even at x2 | Slot disable vs lane split → SE11-GATE-02 |
+| GPU slot / length / power | B11 single-slot FH 241 mm, PCIe 5.0 x16, 12V-2x6 ↔ PCI_E1 x16, B08 mid-tower, B07 native 12V-2x6 | Mechanically and electrically consistent | Length clearance → SE11-GATE-07; power budget → SE11-GATE-04 (analytical) / SE11-GATE-11 (measured) |
+| PSU connectors | B07 dual EPS 8-pin ↔ B03 dual 8-pin EPS | Compatible | — |
+| PSU capacity (MP-DC) | B07 750 W DC, L_PSU = 0.75 × 750 W = 562 W, vs non-overlapping estimates (§7.3): without GPU E1 300–350 W / E2 345–405 W; with GPU E1 445–495 W / E2 490–550 W (ASM-SE11-06) | All four ≤ 562 W: 53–60 % headroom without GPU; 34–41 % (E1) and 27–35 % (E2) with GPU — passes analytically on both estimates; seed-conditioned on measured validation; a GPU-less wall figure above 417 W is an analytical fail | SE11-GATE-04 (a) / SE11-GATE-11 |
+| Host OS / virtualization | B09 Windows 11 Pro ↔ Hyper-V requirement (§166) | Pro edition supports Hyper-V and BitLocker | TPM 2.0 (AMD fTPM) and Secure Boot enabled → §11 |
+| NAS memory | B13 DDR5-4800 ECC SO-DIMM ↔ B12 "2 slots, 64 GB max, DDR5-4800 ECC" | Type-compatible; mixed 16+32 GB | Vendor support of mixed sizes → SE11-GATE-05 |
+| NAS drives | B14 3.5" SATA CMR ↔ B12 8× SATA bays | Compatible; RAID 6 across 6 leaves 2 bays | Drive-model support on vendor list → SE11-GATE-01 |
+| NAS / host ↔ switch | 10GbE RJ45 (B10, B12) ↔ B18 ≥2×10GBase-T; 5 GbE-capable management ports ↔ 1/2.5GbE access ports | Compatible if the switch 10G ports are 10GBase-T (not SFP+) — class constraint in ADR-04; management links negotiate down to 1/2.5 Gb/s by design (§6.2) | SE11-GATE-08 |
+| UPS ↔ loads (MP-AC) | B15 1000 W / 1500 VA vs UPS-A output 435–605 W (460–640 VA) without GPU, 610–775 W (645–815 VA) with GPU | Within rating in both cases; with GPU 61–78 % of 1000 W, inside the 80 % rule of SE11-GATE-04(c) at the planning upper bound | Runtime vs shutdown timeline (I1–I3) → SE11-GATE-06 |
+| UPS ↔ NAS signalling | B15 USB-HID ↔ B12 "UPS support / network UPS server" | Compatible by stated capability | Protocol compatibility of the specific units → SE11-GATE-06 |
+| Electrical | B19 two 15 A circuits vs seed peak 1,150–1,300 W total across two domains | Each domain well inside a 15 A branch | Separate-breaker verification by electrician → SE11-REQ-13 |
+
+No impossible or internally contradictory combination was found in the seed's stated specifications. The two lane-sharing relations are the only items whose resolution could change the slot plan, and SE11-DEC-03 already defines the response.
+
+### 10.3 Evidence gates for external facts
+
+| Gate | What is verified | By whom | At which stage | If it fails |
+|---|---|---|---|---|
+| SE11-GATE-01 | Each BOM part (B01–B15, B18 class) is currently supported by its manufacturer (firmware/driver for the chosen host OS and NAS OS) and practically obtainable in the specification class stated; drive models on the NAS compatibility list | SE11 with SE20 | Before Stage 1 build start | Apply SE11-DEC-08 substitution by specification class; record SE11-DEC-nn |
+| SE11-GATE-02 | Board documentation for the delivered revision: PCI_E3/M2_3 sharing behaviour, M2_2/USB4 behaviour, chipset uplink width | SE11 | At receipt, before assembly | Mutual exclusion → execute SE11-DEC-03; uplink narrower than assumed → re-prioritize IO classes in §6.3 and record |
+| SE11-GATE-03 | Post-install: EXPO stability ≥24 h memory test for the installed population (two-DIMM at M128, four-DIMM at M256) at target frequency, else at step-down; measured memory use through Stage 2 against the installed class (§4.3) | SE11 (stability), SE01 (use) | Burn-in; Stage 2 exit | Unstable at 5200 → ESCALATE (kit substitution by class); use <40 % of class → size next node class down; reserved use above §12.3 thresholds → M128→M256 growth (GATE-03 re-run) or §12.3 split |
+| SE11-GATE-04 | Pre-install GPU admission (§7.3 step 1): (a) E1 and E2 ≤ L_PSU = 0.75 × installed PSU DC rating (562 W at 750 W); (b) 12V-2x6 cable, PCI_E1 free, fit per GATE-07; (c) projected UPS-A output (measured GPU-less load + ~167 W) ≤ 80 % of 1000 W / 1500 VA; (d) projected runtime at the new load satisfies I1 and I2 with measured S_H, S_N and configured T_NF, T_stale_max | SE11 with SE19 | When B11 is triggered, before installation | Separate responses (§7.3): (a) PSU substitution by class (≥850 W-class ATX 3.1, native 12V-2x6), L_PSU recomputed, GATE-04 (a)–(d) and GATE-07 repeated; (b) cable/chassis or GPU-class substitution, GATE-04(b)/GATE-07 repeated — a PSU change is no remedy; (c) PD-A load reduction or larger UPS class, GATE-04(c)(d) and GATE-06 repeated; (d) battery replacement / load reduction / S_H–S_N tuning / larger UPS class, GATE-06 then GATE-04(d) repeated. GPU not installed until all four pass |
+| SE11-GATE-05 | NAS vendor supports 16 GB + 32 GB mixed ECC configuration with ECC active | SE11 | At NAS commissioning | Substitute 2× matched ECC SO-DIMMs by class |
+| SE11-GATE-06 | Measured UPS-A load % and runtime R_measured (and the runtime-versus-load curve); measured S_H, S_H′, S_N; configured P, T_ob, T_stale, T_stale_max, M and derived T_NF satisfy I1, I2, I3 of SE11-REQ-16 (hence SE11-REQ-12); NAS low-battery guard set to ≤ S_N + M remaining; NAS↔UPS protocol works; drills (a)–(e) of SE11-AC-05 pass; re-run after SE11-GATE-11 and whenever PD-A load changes | SE11 with SE20 | Acceptance (§14); again after GPU install | Loading fail → response (c) of §7.3; runtime/inequality fail → response (d) of §7.3 (battery replacement, PD-A load reduction, S_H / S_N tuning by SE20, else ESCALATE to larger UPS class); drill ordering fail → client/server configuration corrected by SE20 and the drill repeated; the gate is repeated after each change |
+| SE11-GATE-07 | Physical fit: cooler/DIMM clearance; GPU length in chassis with front fans; M.2 heatsinks with NIC installed; PSU fit after any PSU substitution | SE11 | Assembly | Minor re-layout; otherwise substitute cooler/chassis by class |
+| SE11-GATE-08 | Switch of the ADR-04 class is obtainable with 10GBase-T ports; L2/L4 negotiate at ≥1 Gb/s and stay up; direct-attach PC↔NAS works for ADR-07 | SE11 with SE14 | Before Stage 1 network bring-up | SFP+-only switch available → add 10GBase-T transceivers as class constraint; L2/L4 unstable → substitute access-port class; direct attach fails → ADR-07 downgraded to "replace switch" only |
+| SE11-GATE-09 | Restore from POOL-S-ISO demonstrated for each irreplaceable class | SE12 executes, SE19 witnesses | Stage 2 exit | Stage 2 does not exit until demonstrated |
+| SE11-GATE-10 | Pre-adoption memory sizing (§4.3): H, R (declared reservations), B (measured P95 burst or 0) recorded; C = (H + R) × 1.25 + B computed; class M128 / M256 selected by the decision rule | SE11 on SE01/EL inputs | Before the memory kit is adopted at Stage 1 build start | C > 256 → ESCALATE ARCHITECTURE IMPACT (§12.3 split before adoption); inputs missing → gate does not close and no memory class is adopted |
+| SE11-GATE-11 | Post-install GPU admission (§7.3 step 2): measured wall input under all-core + GPU stress ≤ L_PSU of the installed PSU (conservative wall test); no PSU over-current / shutdown event; SE11-GATE-06 re-run passes at the new load | SE11 with SE19 | After controlled GPU installation, before GPU workload admission | Headroom fail → GPU stays unadmitted / removed, PSU substitution by class recorded as SE11-DEC-nn, L_PSU recomputed, GATE-11 then GATE-06 repeated; loading / runtime fail at the GATE-06 re-run → responses (c) / (d) of §7.3 and GATE-06 repeated |
+
+### 10.4 Alternatives by specification class (recorded, not selected)
+
+| Item | Specification class for substitution |
+|---|---|
+| B01 | AM5, ≥16 cores Zen 5-class, ≥24 PCIe 5.0 lanes, integrated graphics, ≤230 W package |
+| B03 | ATX AM5 X870-class; ≥4 DDR5 DIMM to 256 GB; ≥1 PCIe 5.0 x16 CPU slot; ≥1 additional x4-capable slot not shared with an M.2 in use; ≥4 M.2; ≥2.5 GbE onboard; dual 8-pin EPS |
+| B04 | M256: 4×64 GB DDR5 UDIMM matched kit; M128: 2×64 GB DDR5 UDIMM matched kit; both AMD EXPO, ≥5600 MT/s rated |
+| B05/B06 | M.2 2280 PCIe 4.0 x4 TLC with DRAM, ≥600 TBW (1 TB) / ≥2,400 TBW (4 TB), 5-year warranty class |
+| B07 | ≥750 W ATX 3.1 / PCIe 5.1, native 12V-2x6, dual EPS, fully modular, Cybenetics Gold-class or better; substitution step on a headroom fail: ≥850 W-class, then 1000 W-class (L_PSU 637 W / 750 W) |
+| B08 | Mid-tower ATX, mesh front, ≥165 mm cooler clearance, ≥250 mm GPU clearance, ≥3 intake fans |
+| B10 | 10GBase-T RJ45 NIC, PCIe 3.0 x4 or PCIe 4.0 x2+, Windows-host driver support |
+| B11 | Single-slot full-height ≤145 W, ≥24 GB ECC VRAM, PCIe 5.0 x16, 12V-2x6 |
+| B12 | 8-bay SATA NAS, ECC DDR5 ≥48 GB capable, ≥2×10GbE, snapshotting checksummed file system, per-folder encryption, network UPS server |
+| B14 | 20 TB-class enterprise CMR SATA, ≥2 M hr MTBF, ≥550 TB/yr workload, 5-year warranty |
+| B15 | ≥1500 VA / ≥1000 W pure sine line-interactive AVR, USB-HID, ≥6 battery outlets, user-replaceable batteries; larger class on a loading/runtime fail: ≥2000 VA / ≥1300 W, same interface and outlet requirements |
+| B16 | ~1000 VA / ≥600 W pure sine, PDU-compatible |
+| B18 | 1U managed, 24 ports, ≥2 (preferably ≥4) ×10GBase-T, remainder 1/2.5GbE access, 802.1Q, SNMP, console |
+
+## 11. Security considerations (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-11)
+
+SE17 owns infrastructure security controls; SE11 states the hardware capabilities that those controls rely on and the hardware-level requirements the architecture imposes. Control ids are SE17's and are referenced by SE17's document; SE11 does not re-derive them.
+
+| Area | Hardware fact (SEED-01) | SE11 requirement | Control owner |
+|---|---|---|---|
+| Trusted boot / firmware | AM5 platform with firmware TPM 2.0 and UEFI Secure Boot capability (board class B03); NAS runs vendor OS | **SE11-REQ-14**: Secure Boot and fTPM enabled on the host before OS install; Wi-Fi 7 and Bluetooth radios (§227.3) disabled in firmware; firmware admin password set; boot order locked to M2_1; USB boot disabled after installation | SE17 (host hardening control), SE20 (verification) |
+| Storage encryption | Windows 11 Pro supports BitLocker (B09); NAS supports per-folder AES-256 (§228.1) | System NVMe (M2_1) BitLocker-protected with TPM; VM virtual disks encrypted at the VM/guest layer so that an NVMe removed from the host is unreadable; NAS folders holding platform/application backups encrypted with keys held outside the NAS; key custody per SE17 | SE17 (encryption/key controls), SE12 (backup encryption scope) |
+| Management interfaces | No BMC; host, NAS, switch consoles | All consoles on MGMT VLAN only; no management interface reachable from PLATFORM/STORAGE VLANs or from worker pools; default credentials changed at commissioning; MFA on host administrative identity per SEED-01 §59 | SE17, SE14 |
+| Physical / administrative access | Desk/room placement (§7.4) | Lockable room; chassis and NAS in a position where drive removal is visible; USB ports policy: HID devices and the UPS cable only; inventory serial check at each maintenance window (SE11-REQ-15) | SE17 (physical access control), SE20 |
+| Secure firmware / driver update path | Vendor signed packages | Only vendor-signed firmware; checksums recorded in the inventory; updates staged from POOL-M, never from a worker pool or a VM with internet-facing agent workloads | SE17 (supply-chain integrity control; SEED-01 §238 appendix I item 8), SE20 |
+| Supply chain | Parts as listed in SEED-01 | Serial numbers recorded at receipt; firmware versions verified against vendor-published baselines at SE11-GATE-01; no refurbished or unverified-origin components for B01–B15 (a specification constraint, not a vendor choice) | SE17 |
+| Private-data boundary | SEED-01 §66: protected records only on local models/tools | POOL-C-AI (and the GPU when adopted) is a VM boundary with no path to external providers except through the disclosure gateway; network policy enforced on the Hyper-V virtual switch and the physical switch | SE17, SE14, EL |
+| Destructive-test containment | SEED-01 §156 | POOL-W-CHAOS network segment cannot reach POOL-C-CORE/POOL-C-DATA segments; enforced at both virtual and physical switch | SE14, SE23 |
+
+## 12. Expansion model (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-12)
+
+### 12.1 Planned spare capacity at baseline
+
+| Resource | Spare at baseline | First expansion step (no architecture change) |
+|---|---|---|
+| Central node PCIe | PCI_E1 x16 (reserved GPU), PCI_E2 x1 | GPU B11 into PCI_E1 via SE11-GATE-04 → controlled install → SE11-GATE-11; PCI_E2 for a low-bandwidth card only |
+| Central node M.2 | 0 of 4 | None — scale-up boundary |
+| Central node DIMM | M128: 2 of 4 free; M256: 0 of 4 (board max) | At M128: second matched 2×64 GB kit → M256 with SE11-GATE-03 re-run; at M256: none — scale-up boundary |
+| Central node SATA | 4 ports | Low-speed local archive only; not a hot-tier expansion |
+| NAS bays | 2 of 8 | +2 drives into the RAID 6 (SE12 plans the expansion) |
+| NAS M.2 | 4 slots | Cache or SSD volume when SE12 shows measured need |
+| NAS memory | 0 of 2 slots (16+32) | Replace to 2×32 GB = 64 GB max |
+| NAS network | 10GbE port 2, 5GbE port 2 | Second host or local worker uplink |
+| Switch (§6.4) | Minimum class: 0×10G, 19 access; preferred class: 2×10G, 17 access | Local workers at 1/2.5GbE on either class; additional 10GbE endpoints only at the preferred class |
+| UPS-A outlets | ≥2 battery-backed | Additional critical network device |
+| UPS-A output load (MP-AC) | Planning 435–605 W of 1000 W (ASM-SE11-06) | GPU adds ~167 W AC (145 W DC ÷ 0.87) → 610–775 W, admitted only through SE11-GATE-04 / -11 / -06 |
+| PSU DC headroom (MP-DC) | E2 345–405 W of L_PSU 562 W | GPU adds 145 W → E2 490–550 W; margin 12–72 W, so the next DC-consuming addition after the GPU is a PSU-class step first |
+| Rack | 18U (deferred) | Worker nodes in trays; 1U switch, PDU, brick shelf |
+
+### 12.2 Scale-out vs scale-up boundaries
+
+- **Scale-up stops at the central node's envelope**: 16 cores / 32 threads (socket's top class per seed), 256 GB board maximum (installed class M128 or M256 per SE11-GATE-10, with M128→M256 the only in-place memory step), four M.2 slots, 24 CPU lanes, 750 W PSU (GPU-dependent; L_PSU 562 W). Nothing in this document plans a bigger single node; the vision's answer to central-node saturation is horizontal workers and hosted capacity (SEED-01 §161, §168 §43 intro, §238), or a second node of the same reference class.
+- **Scale-out is the default**: POOL-W-* grows by hosted executors first (zero local hardware, SEED-01 §158), then by local worker nodes in the deferred rack (B17/B20) when SE11-REQ-04 triggers, then by a second central-class node when stable-runtime pools themselves need redundancy (see 12.3).
+- **Durable tier scales in place** to 8 bays / 64 GB / M.2 cache, then by a second NAS or hosted object store; POOL-S-ISO scales independently.
+
+### 12.3 Triggers that require architecture revision (not just more hardware)
+
+| Trigger (measured by SE01/SE19/SE20 unless noted) | Why adding hardware is not enough | Architectural response (new SE11 revision + EL impact) |
+|---|---|---|
+| Any SLO or product context requires surviving FD-HOST (host loss without platform outage) | Single host cannot host quorum; no BMC | Second node + shared or replicated storage design; quorum placement (SEED-01 §173); possibly hosted control plane |
+| Stable-runtime reserved memory (Highest class) exceeds ~60 % of the installed class sustained, or Highest+High classes exceed 85 % | At M128 the in-place step to M256 is the first response (no revision); at M256 DIMM slots are full | Split POOL-C-DATA or POOL-C-CORE to a second node or hosted; revise §3 pool backing. Also triggered before adoption when SE11-GATE-10 yields C > 256 |
+| Third 10GbE endpoint needed (second host, GPU node, local worker 10GbE uplink) | Minimum switch class has 2×10GbE | Switch class upgrade (ADR-04 preferred class) or second switch tier; revise §6 |
+| GPU trigger fires (§4.4) | PSU, UPS and thermal budget change | Execute SE11-GATE-04 → controlled install → SE11-GATE-11 → SE11-GATE-06 re-run; headroom failure → PSU substitution with recomputed L_PSU; loading/runtime failure → PD-A load or UPS class; GPU passthrough changes VM layout (EL) |
+| Local worker count or rack load exceeds UPS-B class (~600 W) or 17U with gaps | Power domain and rack envelope | Second rack UPS/circuit or hosted workers; revise §7.2 |
+| NAS at 80% after +2 drives, or RAID 6 rebuild window measured longer than the SE12-accepted exposure | Chassis full / risk envelope | Second NAS, different RAID layout, or hosted durable tier; revise §5 |
+| Private-data local inference (§66) becomes a steady-state load exceeding one GPU's envelope | Single PCIe x16 slot | Dedicated inference node; revise §4.4 and §3 |
+| Chipset uplink contention (SE11-GATE-02 finding) measurably limits DB IO during backups | Board lane topology | Re-plan M.2 roles (move DB to M2_2 CPU-attached, artifacts to chipset) — a slot-plan revision, recorded as SE11-DEC-nn |
+| Measured physical-presence recovery is on the incident critical path more than once per stage | No BMC | Add IP-KVM/remote-power class device; revise §9.4 |
+| Measured R_measured / 2 − S_H leaves T_stale_max (I2) below the typical NAS/switch restart time, making holds routine | UPS runtime envelope, not a policy problem | Larger UPS class, or an independent signal path to the host; revise §7.5 and SE11-REQ-16 |
+| Second ISP or offline operation required by product context | Single edge | Dual-uplink edge class; revise §6, FD-EXT |
+
+## 13. Architecture risks, decisions and ADRs (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-13)
+
+### 13.1 Architecture decision records
+
+| ADR | Decision | Alternatives considered and rejected | Rationale (SEED-01) | Status |
+|---|---|---|---|---|
+| SE11-ADR-01 | The central node is the consumer-class reference configuration of SEED-01 §160 (non-ECC memory, no BMC), not a server-class host | (a) Server-class board with ECC RDIMM and BMC — rejected: not in the BOM, contradicts no-overbuild (§158) and the seed's explicit reference configuration; the vision keeps the architecture valid on different hardware anyway (§160); (b) hosted-only start with no local node — not rejected as a *fallback*: it remains the portability escape (§160, §238) | §160 "reference configuration rather than an inherited constraint"; risks SE11-RISK-01/02/09 accepted with mitigations | Accepted |
+| SE11-ADR-02 | Host operating model: Windows 11 Pro + Hyper-V Linux VMs + containers; WSL2 for interactive work only | (a) Bare-metal Linux hypervisor — rejected: §166 fixes the preferred model and §227.9 lists the OS; (b) WSL2 as the service boundary — rejected by §166 explicitly | §166, §167, §168 | Accepted (seed-fixed; SE11 records, does not override) |
+| SE11-ADR-03 | NAS is the UPS master; host is a network UPS client; NAS initiates only at host acknowledgement or at the bounded fallback T_NF; host-side fail-safe SE11-REQ-16 because the signal path crosses FD-NAS and FD-SW | USB to host, NAS as client — rejected (shutdown ordering); a second independent signal path to the host — not in the BOM, recorded as a §12.3 response if measured runtime makes holds routine | §165, §228.1, §229.1 | Accepted (§7.1, §7.5) |
+| SE11-ADR-04 | Switch must be managed / 802.1Q; management links run at ≥1 Gb/s, not 5 GbE | Unmanaged; two-tier switching; requiring 5 GbE access ports — rejected: no POOL-M need | §166, §230; management segmentation | Accepted (§6.1, §6.2) |
+| SE11-ADR-05 | Hot-tier NVMe runs without RAID; durability by replication/snapshot to POOL-S-DUR | Mirrored 4 TB pair — rejected: consumes an M.2 slot that the seed assigns to artifacts/VMs, halves hot capacity, and does not remove the host as the failure domain; RPO is instead set by SE12's replication cadence | §163 "local NVMe is never the sole copy"; §160 slot roles | Accepted (§5.1) |
+| SE11-ADR-06 | No local worker rack at Stage 1; POOL-W-* backed by an in-host Workers VM plus hosted executors; rack/UPS-B/worker nodes deferred until SE11-REQ-04 triggers | (a) Buy a minimal rack with two worker nodes now — rejected: no measured queueing exists (§171), premature capital (§158); (b) hosted-only workers forever — rejected: keeps the local option open per §168 | §158, §166, §171, §230 "no fixed initial worker count", §238 | Accepted (§3, §7.2) |
+| SE11-ADR-07 | Switch-independent recovery by re-patching L1 to NAS port 2 (data path only); no permanent direct link | Second NIC in PCI_E2; dedicating the 5 GbE port | §175 graceful degradation; lane budget §227.3 | Accepted (§6.2) |
+| SE11-ADR-08 | POOL-S-ISO preferred class is a hosted object store with retention lock; removable off-site media and a second NAS are alternates | Second NAS at baseline — rejected: local hardware without measured need (§158); removable media only — acceptable alternate, weaker automation | §164 isolated copy; §238 managed equivalents acceptable | Accepted (§5.3) |
+
+### 13.2 Decision records (SE11-DEC)
+
+| DEC | Statement | Impact |
+|---|---|---|
+| SE11-DEC-01 | Baseline disposition set: every BOM entry B01–B20 is disposed as in §1.3; no SUBSTITUTE and no ESCALATE at version 3 | Downstream documents may rely on the SEED-01 part list as the physical baseline, subject to the gates in §10.3 |
+| SE11-DEC-02 | 256 GB is a conditional reference target; the initial memory class (M128 / M256) is selected by SE11-GATE-10 from declared reservations, host overhead, measured burst and headroom (§4.3) | Downstream references the class symbol until GATE-10 closes; post-install SE11-GATE-03 governs growth or down-sizing |
+| SE11-DEC-03 | NIC keeps PCI_E3; scratch NVMe is sacrificed if sharing is exclusive (§4.2) | Possible 300–600 GB reduction of VM/artifact store |
+| SE11-DEC-04 | The switch is placed in power domain A on UPS-A at baseline, although the seed lists it with the rack (§7.2) | Switch loss and UPS-A loss are correlated; rack adoption must re-decide placement |
+| SE11-DEC-05 | GPU deferred with reserved slot/cable/power and explicit triggers (§4.4); admission through SE11-GATE-04 (install) and SE11-GATE-11 + GATE-06 re-run (workload) | No GPU-dependent workload may be scheduled on POOL-C-AI until admission |
+| SE11-DEC-06 | NAS M.2 slots are not used as write cache at baseline (§5.2) | Durable tier has no SSD cache failure mode; sequential throughput is HDD-bound (ASM-SE11-04) |
+| SE11-DEC-07 | At Stage 1 POOL-W-* local capacity is a single "Workers" VM on the central node, in the Medium/Lowest classes (§3.1) | Worker capacity competes with build/validation burst on one host; hosted executors absorb overflow (and absorb unmeasured burst B under SE11-GATE-10) |
+| SE11-DEC-08 | **Substitution rule.** A BOM item is substituted only when it fails an SE11-GATE or is unobtainable in its specification class; the substitute must meet or exceed the class in §10.4 on every stated attribute (performance, endurance/warranty class, interface, power, form factor), must not reduce any §8 failure-domain property, must preserve the §11 security capabilities (TPM/Secure Boot, encryption, ECC on the durable tier), must keep the architecture portable (no provider-specific or vendor-locked dependency introduced), and must not move a Stage boundary; each substitution is a new `SE11-DEC-nn` naming reason and impact, and triggers re-execution of the affected gates and acceptance criteria in §14 (for a PSU substitution: L_PSU recomputed first) | Preserves performance, reliability, security, portability and schedule assumptions (QC-…-AR-05) |
+
+### 13.3 Risk register
+
+| Risk id | Risk | Failure-domain / item | Likelihood / impact | Mitigation | Owner |
+|---|---|---|---|---|---|
+| SE11-RISK-01 | Single central host: any host fault stops the whole platform at MVP | FD-HOST | Medium / High | Replication to POOL-S-DUR; IaC-driven re-provisioning on hosted infrastructure (§160); revision trigger in §12.3 | SE11, EL |
+| SE11-RISK-02 | Non-ECC host memory: silent corruption in platform-core/data VMs | B04 | Low / High | Checksumming file systems and DB checksums in VMs; ECC on the durable tier; memory stability gate SE11-GATE-03; WHEA monitoring | SE11, SE12 |
+| SE11-RISK-03 | PCIe lane sharing (PCI_E3/M2_3, M2_2/USB4) and chipset uplink contention reduce NIC or NVMe performance | B03 | Medium / Medium | SE11-GATE-02; SE11-DEC-03; IO class scheduling §6.3 | SE11 |
+| SE11-RISK-04 | RAID 6 rebuild window on 20 TB members lasts days; second failure during rebuild | FD-RAID | Low / High | Cold spare on site, monthly scrub (SE11-REQ-08); POOL-S-ISO for irreplaceable data | SE11, SE20 |
+| SE11-RISK-05 | NAS vendor-OS lock-in of the durable tier | B12 | Medium / Medium | SE11-REQ-07 exportability; chassis-independent restore drill (SE11-AC-06) | SE11, SE12 |
+| SE11-RISK-06 | Lifecycle/support windows: consumer parts reach end-of-sale within the program; firmware support lapses | B01–B15 | Medium / Medium | Specification-class alternatives §10.4; inventory tracks firmware baselines; SE11-GATE-01 re-run at each stage exit | SE11 |
+| SE11-RISK-07 | PSU headroom insufficient when the GPU is added: the E2 margin at the planning envelope is only 12–72 W | B07/B11 | Medium / Medium | SE11-GATE-04(a) analytical pre-check on non-overlapping estimates blocks installation; SE11-GATE-11 conservative wall test and SE11-GATE-06 re-run block workload admission; PSU class substitution with L_PSU recomputed; separate responses so that a PSU change is never used for a UPS or fit failure | SE11 |
+| SE11-RISK-08 | UPS-A runtime shorter than the ordered shutdown timeline (I1/I2 violated) | B15 | Medium / High | SE11-GATE-06 measures R_measured, S_H, S_H′, S_N and checks I1–I3; SE11-REQ-12 factor of two; response (d) of §7.3 (battery, load, timing, UPS class); NAS last-resort guard | SE11, SE20 |
+| SE11-RISK-09 | Management plane is the host OS and one switch; no BMC — remote recovery impossible for boot failures; switch loss severs management | FD-MGMT, FD-SW | Medium / Medium | ADR-07 re-patch; IP-KVM class expansion trigger (§12.3); physical access runbook (SE20) | SE11, SE20 |
+| SE11-RISK-10 | Single ISP uplink; external AI providers and hosted executors unavailable | FD-EXT, FD-PROV | Medium / Medium | Graceful degradation (§175); local models for private data (§66); provider fallback (§66); second-uplink trigger (§12.3) | SE11, EL |
+| SE11-RISK-11 | Hardware coupling: application logic binds to device names or capacities, defeating portability | All | Medium / High | Pool abstraction §3.1; §160 rules enforced as policy by SE23; portability drill in §14 | SE11, EL, SE23 |
+| SE11-RISK-12 | Host servicing (BIOS/OS) creates frequent full-platform outages | FD-HOST | High / Low–Medium | Maintenance-window batching (§9.4); updates sequenced after backups | SE20 |
+| SE11-RISK-13 | UPS signal path to the host crosses FD-NAS and FD-SW: the host cannot observe utility loss while the path is down; a utility loss during a maintenance hold, or a battery degraded below R_measured since the last GATE-06 run, ends in battery exhaustion and a hard stop | FD-NAS, FD-SW, FD-UPS-A, FD-MGMT | Low / High | SE11-REQ-16 timeline anchored to t_L with I2 (T_stale_max + S_H ≤ R/2); separately bounded NAS fallback T_NF (I1); holds explicit, logged and window-bounded; drills (a)–(e) in SE11-AC-05 including signal loss immediately before and during utility loss; battery-age and runtime telemetry; consistency checks at restart; hot tier never the sole copy (§163); §12.3 trigger for a larger UPS class or an independent signal path | SE11, SE20 |
+
+Single points of failure are enumerated exhaustively in §8 ("Residual SPOF?" column); none is hidden behind a redundancy claim (QC-…-AR-04).
