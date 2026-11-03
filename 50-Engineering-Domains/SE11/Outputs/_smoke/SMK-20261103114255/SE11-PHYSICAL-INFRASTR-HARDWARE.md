@@ -409,3 +409,103 @@ The corpus contains no market or vendor-support data, and SE11 has no tool acces
 ### 11.4 Interface contract: hardware baseline record
 
 `SE11-CONTRACT-hardware-baseline@1` (owner SE11; registered in SE11's Interface Contract document and later in EL's contract register) publishes, per asset: the fields of §10.1, the disposition from §1.2, the failure-domain ids from §9, the pool ids from §4 and the validation evidence ids from §14. Consumers (EL runtime/deployment/reliability/estimate documents, SE01, SE12, SE14, SE17, SE19, SE20, Stage-14 plans) cite this contract and the disposition they rely on; they never restate hardware facts.
+
+## 12. Expansion model (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-12)
+
+### 12.1 Planned spare capacity at baseline
+
+| Resource | Spare at baseline | Scale path |
+|---|---|---|
+| Host PCIe | PCI_E1 x16 (reserved for GPU), PCI_E2 x1, 2×USB4 | Scale-up only |
+| Host memory | None (256 GB is the board maximum, B3) | **Hard ceiling** — see 12.3 |
+| Host NVMe slots | None (4/4 populated) | Device-capacity scale-up; SATA ×4 available for cold tiers only |
+| NAS bays / M.2 | 2 bays, 4× M.2 | RAID 6 expansion; cache/metadata |
+| NAS network | 1×10GbE + 2×5GbE | Second 10GbE consumer or link redundancy |
+| Switch ports | all minus 2–3 at baseline | Workers, gateway, management devices |
+| Rack | 18U, 12–17U usable (§230) | Worker trays, second switch, PD-B |
+| Power | PD-A margin per §8.2; PD-B unused | Workers only on PD-B |
+| Worker pool | Elastic: hosted/cloud executors unbounded by local hardware (§168) | Scale-out by default |
+
+### 12.2 Evidence-driven triggers that add hardware without architecture revision (§159, §171)
+
+| Trigger id | Signal (from §10.3 telemetry) | Action |
+|---|---|---|
+| TRG-WKR-LOCAL | Measured build/test queue wait p95 above the SE01-defined threshold for two consecutive stages **and** hosted-runner cost or data-privacy makes local execution preferable (§168, §171) — and the limiting factor is worker capacity, not central resources, storage, network, provider quotas or software (§171) | Adopt local worker class (B19), rack, PDU, UPS-B (B16/B17) |
+| TRG-GPU | Measured external-model latency/cost/privacy case or GPU-required application testing (§176) with preconditions §5.4 met | Adopt B11 |
+| TRG-NAS-MEM | NAS memory sustained > 70 % or snapshot/backup jobs missing their window due to memory pressure | Install B13 |
+| TRG-NAS-CAP | T2 utilisation > 70 % | Add drives to free bays (same class as B14) |
+| TRG-NET-10G | L1 utilisation > 70 % sustained during backup windows, or a second 10GbE consumer | Use NAS second 10GbE / add 10GbE ports within the switch class |
+| TRG-NVME-TBW | Any NVMe > 80 % of rated TBW or media errors | Replace with same class (§11.3) |
+| TRG-UPS-BATT | UPS runtime estimate below the §8.3 sequence budget + 30 % | Battery replacement (RB1290X2 class, B15) |
+
+### 12.3 Scale-out versus scale-up boundaries and architecture-revision triggers
+
+The central node complements, never replaces, horizontally scalable workers (§177 acceptance list). Scale-out (more workers, hosted executors) is the default answer to throughput; scale-up applies only to the capabilities the seed assigns to the central node — large contiguous RAM, low-latency CPU, NVMe, centralized data/control services (§161). The following require a revision of this architecture (new SE11 version plus EL review), not a hardware addition:
+
+| Revision trigger | Why adding hardware is insufficient |
+|---|---|
+| REV-MEM: Highest-priority pool floors (§5.2) exceed 85 % of 256 GB on measured p95 | Board memory ceiling reached; a second host, a larger-memory platform class, or hosted data services is an architectural choice |
+| REV-HA: an SLO (§117 governance) requires the control plane or Data VM to survive FD-HOST | Requires a second failure domain (second host or hosted control plane) and quorum design (§173) |
+| REV-GPU-CLASS: accelerator > 145 W, dual-slot, or second accelerator | Exceeds PSU, slot and thermal envelope (§5.4) |
+| REV-STORAGE-HOT: T1 > 85 % after device scale-up, or random-IO workload that cannot stay on host NVMe | NAS is not a hot tier (§164); needs a different storage architecture |
+| REV-NET: storage/core path saturated after using all 10GbE ports, or need for 25 GbE class | Switch and NIC class change ripples through host slots |
+| REV-SITE: requirement for geographic/resilience footprint beyond one room (§226 F.20) | Hosted/hybrid footprint decision |
+| REV-POWER: PD-A measured peak within 20 % of UPS-A rating, or circuit limits reached | UPS/circuit redesign by qualified professionals; possible relocation |
+
+## 13. Security considerations (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-11)
+
+SE11 relies on controls owned by SE17 (infrastructure security) and names them by slug; SE17 assigns the control ids and the detailed design. Nothing here re-derives a control.
+
+### 13.1 Trusted boot and firmware
+
+- UEFI Secure Boot enabled on the host; TPM 2.0 present and enabled (Windows 11 Pro prerequisite, verified in SE11-AC-01); measured boot attestation is an SE17 decision (`SE17-CTRL-trusted-boot`).
+- Firmware integrity: vendor-signed images, checksum verification, maintenance-window staging (§10.4) — `SE17-CTRL-firmware-integrity`.
+- Host firmware settings baseline (virtualization, IOMMU, Secure Boot, TPM, disabled Wi-Fi/Bluetooth, boot order locked to M2_1, administrator password on UEFI) is recorded in the inventory record and re-verified after every BIOS update (SE11-AC-08).
+
+### 13.2 Management interfaces
+
+- All management endpoints (host admin, Hyper-V, NAS admin, switch, UPS service) live on `seg.mgmt`, unreachable from `seg.build`, `seg.worker` and `seg.egress`; access requires MFA and least-privilege, short-lived credentials per the zero-trust policy (§59, §112) — `SE17-CTRL-mgmt-plane-isolation`, `SE17-CTRL-admin-identity`.
+- No management interface is exposed to the internet; remote operator access is through an SE17-approved access path only.
+
+### 13.3 Physical and administrative access
+
+- Lockable room; host, NAS, switch and UPS inside; chassis/NAS tamper-evident seals optional per SE17; physical console access is itself an administrative action logged by SE20 — `SE17-CTRL-physical-access`.
+- Administrative segregation of duties between hardware maintenance (SE11/SE20) and security configuration (SE17) per §112.
+
+### 13.4 Storage encryption support
+
+- Host: Windows 11 Pro full-disk encryption on M2_1 with TPM-bound keys; encryption of VM disks on M2_2 and data volumes on M2_4 is implemented inside the Linux VMs or by the hypervisor as SE17 decides — the hardware supports both (`SE17-CTRL-data-at-rest`).
+- NAS: per-folder AES-256 (B12) for backups, evidence and archives; key custody and recovery under `SE17-CTRL-key-management`; T3 copies encrypted before leaving the site.
+- NVMe sanitisation on decommissioning/RMA (`SE17-CTRL-media-sanitisation`); inventory record marks sanitised state.
+
+### 13.5 Supply-chain and security constraints
+
+- Receipt check: serial numbers recorded, packaging/tamper evidence inspected, firmware version read and compared with the vendor's published current version before first power-on (SE11-AC-01, `SE17-CTRL-hardware-supply-chain`).
+- Confidential processing constraint (§66): private application/customer data is processed only by authorised locally hosted models or deterministic tools; the physical consequence is that any local accelerator (B11) and the Data VM are inside `seg.platform` behind the default-deny disclosure gateway, and no hardware telemetry export (§10.3) carries workload content.
+- No component ships with default credentials left in place; NAS, switch and UPS service credentials are rotated at commissioning (`SE17-CTRL-default-credentials`).
+
+## 14. Validation / evidence plan (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-14)
+
+| AC id | Check | Pass criterion | Evidence artefact | Executing owner | Needed by |
+|---|---|---|---|---|---|
+| SE11-AC-01 | Compatibility, support and availability gate | Every B1–B15, B17 item: current manufacturer support confirmed with dated source; firmware/BIOS version supporting the combination identified; practical availability confirmed or §11.3 alternative selected and logged as SE11-DEC; receipt check (§13.5) complete | Dated compatibility/availability record attached to the inventory record | SE11 (SE20 assists at receipt) | Before any build; Stage 1 start |
+| SE11-AC-02 | Slot, lane and mechanical verification | Read-back of negotiated PCIe width/speed for M2_1–M2_4 and PCI_E3 with all devices installed; M2_3/PCI_E3 coexistence confirmed or fallback invoked; cooler/case clearance photos; GPU mechanical check when B11 is triggered | Firmware/OS link-state dump; inventory photos | SE11 | Stage 1 |
+| SE11-AC-03 | OS / virtualization enablement | Hyper-V operational with four Linux VMs; NIC bound to virtual switch at 10 Gb/s; Secure Boot + TPM reported enabled; GPU-to-VM path evaluated (when triggered) | Hypervisor and guest configuration export; test log | SE11 with EL | Stage 1 |
+| SE11-AC-04 | Burn-in and performance baseline | ≥ 24 h combined CPU/memory/NVMe stress with zero memory errors at the chosen DDR5 profile (fallback to 5600/5200 if any error, per B4); sustained thermals within device limits; NVMe sequential/random and L1 throughput recorded as the measured replacement for §6.2 | Stress logs, telemetry export, baseline numbers table | SE19 (executes), SE11 (accepts) | Stage 1 |
+| SE11-AC-05 | Network path verification | Host↔NAS ≥ 0.7 GB/s sustained during concurrent build-cache load (SE11-REQ-04); segments `seg.*` enforced; management plane unreachable from build/worker/egress segments | Throughput test log; segmentation test log | SE14 (design), SE19 (test), SE17 (segmentation) | Stage 1 |
+| SE11-AC-06 | Power and shutdown verification | Measured PD-A load (idle, typical, full stress, with/without GPU) at the UPS; UPS runtime at measured load; full mains-loss drill completes the §8.3 sequence with ≥ 30 % runtime reserve; VMs and NAS come back clean; electrician's sign-off of circuits A/B on file (SE11-REQ-10) | Power measurement table; drill log; professional sign-off reference | SE11 (measurement), SE20 (drill), qualified electrician (circuits) | Stage 1 before stable-runtime baseline |
+| SE11-AC-07 | Storage durability and recovery drill | Snapshot + replication T1→T2 verified; restore of a VM and a database from T2 to a clean volume within SE12's RTO; NAS single-drive pull with rebuild time recorded (ASM-SE11-04 replaced by measurement); T3 copy existence verified for the irreplaceable set | Restore drill log; rebuild timing; T3 inventory | SE12 (policy), SE19/SE20 (drill) | Stage 2 (T3 may be "as program matures", §164, but no later than Stage 3) |
+| SE11-AC-08 | Security baseline of hardware | Firmware settings baseline (§13.1) verified; management interfaces reachable only from `seg.mgmt` with MFA; disk/folder encryption active where §13.4 requires; default credentials rotated | SE17 control evidence referencing the inventory ids | SE17 | Stage 1 (host, NAS), Stage 3 (full) |
+| SE11-AC-09 | Telemetry coverage | Every signal in §10.3 visible in SE20 monitoring with alert thresholds from §12.2 | Dashboard/alert export | SE20 | Stage 1 |
+| SE11-AC-10 | Inventory and baseline sign-off | Inventory record complete for every asset; `SE11-CONTRACT-hardware-baseline@1` published; §17 sign-off record filled with evidence ids of AC-01…AC-09 | Signed baseline record | SE11 | Before downstream consumption as "verified" |
+
+Resilience tests beyond the above (fault injection on `pool.validate`, switch loss, NAS loss, provider loss) are specified and run by SE19 against the failure domains in §9; SE11 supplies the physical means (spare cables, drive-pull procedure, power-cut procedure) and accepts the evidence.
+
+## 15. Exclusions (BND-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01 … AR-04)
+
+| Exclusion | Disposition in this document |
+|---|---|
+| BND-01 Purchase orders, price negotiation, vendor-selection scorecards, procurement workflow | Excluded. No prices, suppliers, order quantities or purchase approvals appear; part numbers are cited only as they appear in SEED-01 and alternatives are by specification class (§11.3). Nobody owns procurement in this chain. |
+| BND-02 Project-owned acquisition dates | Excluded. Only dependency windows are referenced ("Stage 1", "before stable-runtime baseline") as the stage by which evidence is needed; no calendar dates. |
+| BND-03 Detailed software/container/service design owned by existing SE11 artefacts | Excluded. §4–§5 stop at pools, VM boundaries and reservations; service design, container images and pipelines are referenced to EL and SE11's other artefacts. |
+| BND-04 Unverified assumptions presented as confirmed hardware facts | Complied with. Every non-seed figure is marked as an engineering assumption (ASM-SE11-nn) or a validation gate (SE11-AC-nn); availability and support currency are explicitly not asserted (§11.2). |
