@@ -1,0 +1,92 @@
+---
+id: SE11-PHYSICAL-INFRASTR-HARDWARE
+version: 3
+status: complete
+owner: REVIEWER_EN
+based_on: [SE11-PHYSICAL-INFRASTR-HARDWARE, SEED-01]
+requirements: [ENV-DEC-017, SE11-REQ-12, SE11-REQ-16, SE11-GATE-04, SE11-GATE-06, SE11-GATE-10, SE11-GATE-11, SE11-AC-05]
+---
+run_id: SMK-20261103192618:SE11-PHYSICAL-INFRASTR-HARDWARE:review:2
+task_id: SE11-PHYSICAL-INFRASTR-HARDWARE
+reviewed_version: 2
+verdict: revise
+summary: >-
+  All outline subjects have explicit sections and quality/boundary dispositions.
+  The memory-sizing and network-port corrections address their prior findings.
+  The revised power-admission and UPS-shutdown mechanisms remain internally
+  contradictory and cannot be implemented as written.
+review_scope:
+  - Target version 2 supplied in context, including revision notes.
+  - SEED-01 Proposed Revision 1.1, sha 2d3a171d6961a8790f5a9812eeb1e3907f188242; sections 162 and 227 checked directly for memory sizing and compute/power BOM constraints.
+  - Missing upstream documents, contract registration, absent register ids and external hardware verification excluded under smoke-run rules.
+prior_finding_dispositions:
+  - id: REVIEWER_EN-SE11-PHYSICAL-01
+    disposition: closed
+    reason: SE11-GATE-10 selects initial memory from explicit inputs rather than committing the maximum BOM configuration.
+  - id: REVIEWER_EN-SE11-PHYSICAL-02
+    disposition: open
+    reason: Autonomous shutdown is now specified, but its timers contradict the required host-before-NAS shutdown order.
+  - id: REVIEWER_EN-SE11-PHYSICAL-03
+    disposition: open
+    reason: AC/DC measurement points and staged installation are separated, but the revised admission equation double-counts CPU power and the substitution path retains the original fixed threshold.
+  - id: REVIEWER_EN-SE11-PHYSICAL-04
+    disposition: closed
+    reason: Required negotiated management speeds and minimum/preferred switch port budgets are reconciled.
+findings:
+  - id: REVIEWER_EN-SE11-PHYSICAL-02
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07
+    source_or_requirement_id: SE11-REQ-16
+    description: >-
+      Sections 7.5 and 17 do not implement the shutdown order required by
+      SE11-ADR-03 and SE11-AC-05. Rule 2 allows the host to wait until T_ob
+      before starting shutdown, while rule 6 makes the NAS shut down after
+      S_measured plus margin from the original on-battery event, whether or
+      not the host acknowledges. The supplied planning values permit the
+      NAS to start shutdown at minute 4 while the host waits until minute 5
+      to start its own shutdown. The NAS therefore removes both the backup
+      target and UPS server before the host finishes, even with an initially
+      intact signal chain. The STALE timeout also lacks a single time origin:
+      it is applied after T_stale detection, but its runtime bound omits that
+      detection interval. A later drill does not resolve these conflicting
+      configuration instructions.
+    required_correction: >-
+      Define a common event timeline and separate host and NAS shutdown
+      durations. Derive host initiation, host completion, NAS initiation and
+      NAS completion deadlines that preserve host-before-NAS ordering when
+      communication is intact and finish within the measured runtime margin.
+      Define the bounded no-acknowledgement fallback separately. Anchor the
+      stale deadline to the last valid update or include polling/detection
+      delay explicitly in its runtime inequality. Replace ASM-SE11-08 with
+      a worked timeline satisfying those inequalities and align GATE-06 and
+      AC-05 assertions with that timeline, including signal loss immediately
+      before or during utility loss.
+  - id: REVIEWER_EN-SE11-PHYSICAL-03
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07
+    source_or_requirement_id: SE11-GATE-04
+    description: >-
+      Section 7.3 step 1 adds CPU package limit plus GPU power plus the whole
+      GPU-less host wall measurement as the upper bound of everything else.
+      That wall measurement already includes CPU power. With the document's
+      own 345–405 W GPU-less wall envelope, the gate computes
+      230 + 145 + 345–405 = 720–780 W, not the 450–500 W MP-DC budget stated
+      to pass analytically. It therefore rejects the stated baseline through
+      double counting. Both GATE-04 and GATE-11 then prescribe a larger PSU
+      on failure but retain a fixed 562 W threshold derived from the original
+      750 W PSU. A larger PSU cannot remedy a capacity failure under an
+      unchanged threshold; likewise it cannot resolve the separate UPS-load
+      or runtime failures grouped under the same fallback.
+    required_correction: >-
+      Use a non-overlapping component DC budget, or a documented whole-host
+      GPU-less upper bound plus incremental GPU power without adding CPU
+      power again. Show the arithmetic for the stated envelope. Express the
+      PSU headroom limit as 0.75 times the installed PSU DC rating, with the
+      conservative wall-input test explicitly identified as such, and
+      recompute it after substitution. Give separate failure responses for
+      PSU headroom, connector/fit compatibility, UPS loading and UPS runtime;
+      repeat the affected gates after each change. Align sections 7.3,
+      10.2–10.3 and the acceptance references.
+unresolved_issues: []
