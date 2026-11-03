@@ -137,3 +137,131 @@ Workloads are scheduled to pools by label; no workload may reference a physical 
 ### 3.3 Reservation rule (SE11-REQ-02)
 
 The central host reserves capacity for POOL-CENTRAL-CORE and POOL-CENTRAL-DATA first (§157 "favor hard runtime SLOs"), POOL-CENTRAL-VALIDATION second near stage gates, and lets POOL-CENTRAL-BUILD and workers burst into the remainder. Exact allocations are a measured sizing output of `SE11-HARDWARE-CAPACITY-SIZING`; the forecast ranges used to justify the baseline are in §4.3.
+
+## 4. Compute architecture (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04)
+
+### 4.1 Central host component requirements and dispositions
+
+| BOM ref | Requirement derived from the vision | Disposition | Engineering constraint / reason |
+|---|---|---|---|
+| G.1.1 CPU | ≥16 homogeneous cores for concurrent runtime + build + validation on one host (§153, §161) | **SE11-DEC-01: ADOPT** | ~230 W package power limit (§227.1) is the CPU line of the power budget (§7.3). Integrated graphics serves the host console so PCI_E1 stays free for the accelerator (G.1.11). |
+| G.1.2 Cooler | Sustain CPU package power without throttling below base clock | **SE11-DEC-02: ADOPT** | Height 157 mm vs chassis clearance ~166 mm (§227.2 vs §227.8): fits with 9 mm margin. Validation SE11-AC-04 (thermal). |
+| G.1.3 Motherboard | 4× DDR5 to 256 GB; ≥4 M.2; one x16 for accelerator; one ≥x4 slot for 10GbE NIC; 5 GbE onboard | **SE11-DEC-03: ADOPT WITH ENGINEERING CONSTRAINT** | (a) §227.3 declares PCI_E3 (Gen4 x4) "shares with M2_3" and M2_2 (Gen5 x4) "sharing with USB4". The BOM populates PCI_E3 (NIC) **and** M2_3 (scratch NVMe) simultaneously; whether both operate concurrently, and at what lane width, is not stated in the corpus and must be verified in firmware before the slot map is frozen (SE11-AC-02). (b) USB4 ports must not carry platform-critical throughput while M2_2 holds the VM/artifact store. (c) No BMC: management plane is limited (§9, SE11-ADR-08). Slot map is fixed as in §227.5/§227.6: M2_1 system, M2_2 VM+artifacts, M2_3 scratch, M2_4 data, PCI_E1 accelerator, PCI_E3 NIC, PCI_E2 (x1) spare. |
+| G.1.4 Memory | Enough RAM to run the five logical environments of §156 concurrently with reserved headroom (§157) | **SE11-DEC-04: ADOPT WITH ENGINEERING CONSTRAINT** | 256 GB adopted on the forecast in §4.3 and SE11-ADR-02 (not because it is the board maximum). Constraints: run EXPO DDR5-6000; if 4-DIMM training is unstable step down to 5600 then 5200 (§227.4) and record the final speed in inventory; memory is **non-ECC** → POOL-CENTRAL-DATA uses a checksumming filesystem/DB-level checksums (SE12 input) and every durable copy lives on the ECC NAS (§163); 24 h memory-test burn-in before acceptance (SE11-AC-03). |
+| G.1.5 2× 1 TB NVMe | System volume; build cache/scratch | **SE11-DEC-05: ADOPT WITH ENGINEERING CONSTRAINT** | M2_3 is Gen4 **x2** (§227.3) → scratch drive runs at half its rated interface; acceptable for cache/scratch. Conditional substitution rule **SE11-DEC-10a**: if SE11-AC-02 shows PCI_E3 and M2_3 cannot co-operate, the scratch role moves to a SATA 6 Gb/s SSD of ≥1 TB TLC-with-DRAM class on one of the four free SATA ports (equivalent role, lower bandwidth, no slot conflict) — recorded as SUBSTITUTE at that time. |
+| G.1.6 2× 4 TB NVMe | Platform data/DB/containers (M2_4); VM disks + artifact store (M2_2) | **SE11-DEC-06: ADOPT** | Role binding per §227.6. Neither drive is mirrored: resilience is snapshot + backup to POOL-DURABLE at the RPO SE12 sets (SE11-REQ-05). 2,400 TBW endurance each is the write-budget telemetry threshold (§9). |
+| G.1.7 PSU 750 W | Headroom over sustained peak including the optional accelerator | **SE11-DEC-07: ADOPT WITH ENGINEERING CONSTRAINT** | Budget in §7.3 shows ~340–380 W without GPU and ~480–530 W with GPU (estimate ranges). Constraint: before SE11-DEC-11 is exercised, a measured sustained-peak test must show ≤ 75 % of rated continuous output (SE11-AC-05). Native 12V-2x6 cable and dual EPS match §227.3/§227.11 connectors. |
+| G.1.8 Case | House ATX board, 157 mm cooler, up to 241 mm single-slot card, 3 intake fans | **SE11-DEC-08: ADOPT WITH ENGINEERING CONSTRAINT** | Cooler clearance verified from BOM data; accelerator length clearance (241 mm) is **not** in the corpus → verify before SE11-DEC-11 (SE11-AC-02). Full-mesh front is the dust/thermal consideration for desk placement (ASM-SE11-02). |
+| G.1.9 Windows 11 Pro | Physical host, Hyper-V, vendor utilities, WSL2 (§166, §167) | **SE11-DEC-09: ADOPT WITH ENGINEERING CONSTRAINT** | Host role only: no durable platform service runs on the host OS or in WSL2 (§166, §177 acceptance). Host firmware trust features in §11. |
+| G.1.10 10GbE NIC | ≥10 Gbit/s path to the durable tier (§166) | **SE11-DEC-10: ADOPT WITH ENGINEERING CONSTRAINT** | PCIe 3.0 x4 card in the Gen4 x4 PCI_E3 slot: interface-compatible. Subject to the lane-sharing validation in SE11-DEC-03/AC-02; the NIC keeps PCI_E3 in every outcome because PCI_E2 is x1 and cannot carry 10GbE. |
+| G.1.11 GPU | Local inference/vision/generation when justified (§176) | **SE11-DEC-11: DEFER / OPTIONAL** | Triggers in §12.3. When triggered: PCI_E1, 12V-2x6 from the PSU's native cable, power re-validation (SE11-AC-05), length clearance (SE11-AC-02), pass-through to one VM only, governed by AI-dependency controls (§177). Equivalent spec class if the part is unavailable: single-slot, ≤150 W, ≥24 GB ECC VRAM, PCIe x16, workstation driver line. |
+
+### 4.2 Host-role and virtualization implications
+
+- Host = Windows 11 Pro with Hyper-V enabled; durable services run in Linux VMs; containers inside VMs are the unit of work (§166–§168). WSL2 + Docker Desktop coexist with Hyper-V on the same host and belong to POOL-DEV only.
+- VM boundaries at baseline follow the §167 layout (Core, Data, Build/CI, Validation/Staging); the final VM count is an engineering decision by EL/SE domains (§167) — this document reserves physical resources per pool, not per VM.
+- Resource-reservation constraints (SE11-REQ-02): the host OS keeps a fixed reserve (see §4.3); POOL-CENTRAL-CORE and POOL-CENTRAL-DATA get static vCPU/RAM reservations; BUILD and VALIDATION get quotas with burst; POOL-DEV is capped.
+- Device assignment: M2_4 is dedicated to the Data VM (data volume), M2_2 holds VM disks + artifact store, M2_3 is the Build VM scratch, M2_1 is host-only. The accelerator, when present, is assigned to exactly one VM at a time.
+
+### 4.3 Forecast sizing ranges (basis for SE11-DEC-04; measured sizing supersedes in `SE11-HARDWARE-CAPACITY-SIZING`)
+
+Assumption basis: ASM-SE11-03 (no measured telemetry exists at greenfield start; ranges reflect the five concurrent environments of §156 and the priority classes of §174). All numbers are planning ranges, not commitments.
+
+| Consumer | RAM range (GB) | vCPU range | Why |
+|---|---|---|---|
+| Windows host + Hyper-V + vendor tools | 12–24 | 2–4 | host services, console |
+| POOL-DEV (WSL2 + Docker Desktop) | 8–16 (capped) | 2–4 | §166 interactive use |
+| POOL-CENTRAL-CORE | 24–48 | 6–8 | orchestration, queues, registry |
+| POOL-CENTRAL-DATA | 32–64 | 4–8 | DB caches, search/knowledge |
+| POOL-CENTRAL-BUILD | 32–64 (burst) | 8–16 (burst) | parallel builds/tests |
+| POOL-CENTRAL-VALIDATION | 32–64 | 6–12 | production-like staging + challenger |
+| Reserve / headroom (SE11-NFR-06) | ≥ 15 % of total | — | §157 |
+| **Total** | **140–280** | over-subscribed by design | 256 GB sits inside the range; 128 GB would force serial use of environments, contradicting §153 |
+
+## 5. Storage architecture (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05)
+
+### 5.1 Tiers and roles
+
+| Tier | Device | Role (SEED-01 §163/§164) | Redundancy boundary | Recovery expectation |
+|---|---|---|---|---|
+| Hot working set | NVMe M2_1 (1 TB) | Host system | none (rebuild from image) | reinstall host from version-controlled definitions (§160) |
+| Hot working set | NVMe M2_3 (1 TB, Gen4 x2) | Build cache / scratch | none; disposable | cache rebuild; no recovery needed |
+| Hot working set | NVMe M2_2 (4 TB) | VM disks, artifact store | none; VM snapshots + backup to NAS | restore VM disks from NAS snapshot/backup |
+| Hot working set | NVMe M2_4 (4 TB) | Platform data, DBs, container layers | none; DB-level backup + NAS copy | restore DB from last consistent backup on NAS at SE12's RPO |
+| Durable | NAS RAID 6, 6× 20 TB (80 TB nominal / ~72.8 TiB usable, §228.3) | Backups, snapshots, release evidence, VM/container archives, artifact history, repository mirrors, platform/app backups (§164) | tolerates 2 concurrent drive failures (SE11-NFR-03); 2 free bays for hot-spare or expansion | rebuild degraded array; irreplaceable data additionally has an isolated/off-site copy (§164; ASM-SE11-04 on timing) |
+| Isolated copy | Not in BOM; required "as the program matures" (§164) | Truly irreplaceable data | independent of FD-NAS, FD-CENTRAL-HOST, FD-UPS-A, FD-CIRCUIT-A, FD-RACK | SE12 defines medium and cadence (SE11-REQ-05) |
+
+Dispositions: **SE11-DEC-12 (G.2.1 NAS): ADOPT WITH ENGINEERING CONSTRAINT** — RAID 6 mandatory, snapshots enabled on every platform share, per-folder AES-256 for sensitive classes (§11), NAS acts as network UPS server/client with the host (§7.4), one 10GbE port reserved for the host link. **SE11-DEC-13 (G.2.2 NAS memory): ADOPT** — 48 GB ECC total is below the 64 GB maximum and supports snapshot/cache load; no sizing concern. **SE11-DEC-14 (G.2.3 drives): ADOPT WITH ENGINEERING CONSTRAINT** — six drives in RAID 6 is the minimum set that gives two-disk fault tolerance with useful capacity; the 2 spare bays are reserved for expansion or a hot spare and are not populated until the 70 % trigger in §12.
+
+### 5.2 Bandwidth / IOPS / latency assumptions
+
+| Path | Rated (BOM) | Planning assumption | Validation |
+|---|---|---|---|
+| M2_4 / M2_2 (Gen4 x4 slots) | up to 7,300 / 6,300 MB/s (§227.6) | sustained ≥ 70 % of rated sequential under burn-in; random IOPS measured, not assumed | SE11-AC-06, SE11-NFR-01 |
+| M2_3 (Gen4 x2) | drive rated as above; slot halves interface | ≤ ~50 % of drive rating; acceptable for scratch | SE11-AC-06 |
+| Host ↔ NAS 10GBase-T | 10 Gbit/s link | ≥ 8 Gbit/s sustained single-stream TCP; NAS HDD array, not the link, is the ceiling for large sequential backup | SE11-AC-07, SE11-NFR-02 |
+| NAS array (6× 7,200 rpm CMR RAID 6) | not stated | sequential throughput in the hundreds of MB/s class; random IOPS low — never used as a database tier (§164 "not a substitute for central NVMe latency") | SE11-AC-07 |
+
+### 5.3 Capacity headroom and triggers (SE11-NFR-06)
+
+- NVMe volumes: alert at 70 % used, act at 80 %; M2_3 scratch is auto-pruned.
+- NAS: alert at 70 % of usable, populate the 2 spare bays at 80 %; >8 bays needed → architecture revision (§12.3).
+- Write endurance: NVMe TBW consumed tracked; replacement planned at 80 % of rated TBW (600 TBW for 1 TB, 2,400 TBW for 4 TB).
+- Retention policy and what counts as "irreplaceable" are SE12-owned inputs (SE11-REQ-05); SE11 only guarantees the physical tiers and the isolation between them.
+
+## 6. Network architecture (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-06)
+
+### 6.1 Link and port inventory
+
+| Endpoint | Ports (BOM) | Baseline use | Spare |
+|---|---|---|---|
+| Central host | 1× 10GBase-T (NIC, PCI_E3); 1× 5 GbE onboard; Wi-Fi 7; 2× USB4 | 10GbE → NAS (storage/artifact east-west); 5 GbE → site gateway (north-south, management) ; Wi-Fi disabled for platform traffic | USB4 (not for platform traffic, SE11-DEC-03) |
+| NAS | 2× 10GbE; 2× 5GbE; 2× USB4 | 10GbE #1 → host; 5GbE #1 → site gateway (management/UI, backup pulls from hosted sources) | 10GbE #2, 5GbE #2 → switch when rack exists |
+| Switch (deferred) | BOM: 24-port, "at least 2×10GbE" (§230) | when triggered: all 10GbE endpoints, worker links, management VLAN | see SE11-DEC-18 |
+| Site gateway | not in BOM — ASM-SE11-01 | internet / external AI / hosted runners | — |
+
+### 6.2 Decisions
+
+- **SE11-ADR-03 / Stage-1 topology:** host ↔ NAS is a direct 10GBase-T point-to-point link; north-south traffic uses the onboard 5 GbE ports. Rationale: the only two 10GbE endpoints at baseline are the host and the NAS; a switch adds a failure domain and cost without measured need (§166 "purchased incrementally from measured need"). Rejected alternative: switch at Stage 1 — rejected until a trigger in §12 fires.
+- **SE11-DEC-17 (G.4 rack set): DEFER / OPTIONAL** — rack, PDU, trays, shelf and switch are provisioned together when local workers are triggered (SE11-DEC-20) or when a third 10GbE endpoint appears.
+- **SE11-DEC-18 (switch spec class): ADOPT WITH ENGINEERING CONSTRAINT** — the seed minimum "at least 2×10GbE" is insufficient once the host (1) and NAS (2) are both on the switch; the constraint is **≥ 4× 10GBase-T ports** plus ≥ 16 ports of 1/2.5 GbE for workers and management, non-blocking fabric, VLAN-capable, 1U. This is a tightened minimum inside the seed's "at least", not a substitution.
+- East-west artifact/data traffic (builds pulling from the artifact store, backups to NAS) stays on the 10GbE path; worker links may be slower (§166) — 1/2.5 GbE per local worker is the planning class.
+- Bottleneck avoidance (SE11-REQ-03): the shared storage/control path must not be the first bottleneck during concurrent transfers (§166) → the host's single 10GbE link is the known ceiling; the trigger for a second 10GbE host path (NAS has a spare 10GbE port; host would need PCI_E3 bandwidth or USB4-attached 10GbE — the latter conflicts with SE11-DEC-03) is sustained >80 % utilisation; that trigger is an architecture-revision item (§12.3), not a quiet add.
+- Management segmentation (SE11-REQ-04): at Stage 1 management traffic (host remote management, NAS ADM UI, UPS monitoring) is confined to the 5 GbE gateway-side segment; when the switch exists, a dedicated management VLAN carries it, separate from worker and storage VLANs. VLAN design and addressing are SE14; firewall policy is SE17.
+- Expansion ports/headroom: NAS 10GbE #2 and 5GbE #2, host USB4 ×2 (non-platform), switch ports per SE11-DEC-18.
+
+## 7. Physical power / placement architecture (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07)
+
+### 7.1 Power domains
+
+| Power domain | Feed | Loads | Disposition |
+|---|---|---|---|
+| PD-A | Circuit A (15 A) → UPS-A CP1500PFCLCD (1500 VA / 1000 W, pure sine, AVR, 6 battery outlets) | Central host, NAS, site gateway if co-located, (nothing else) | **SE11-DEC-15: ADOPT WITH ENGINEERING CONSTRAINT** — steady load ≤ 60 % of 1000 W, measured sustained peak ≤ 75 %; USB-HID to the host; NAS shutdown coordinated via the NAS network-UPS function (§228.1); battery runtime ≥ 2× measured graceful-shutdown duration (SE11-NFR-04, SE11-AC-08); user-replaceable battery set recorded in inventory |
+| PD-B | Circuit B (15 A) → UPS-B ~1000 VA / 600 W pure sine (model TBD) → 1U PDU | Rack: switch, local workers | **SE11-DEC-16: DEFER / OPTIONAL** — spec class when triggered: pure sine, ≥ 1000 VA / 600 W, network or USB monitoring, ≥ 6 battery-backed outlets, 1U/2U rack or tower |
+| Circuits | Two separate 15 A breakers; dedicated 20 A optional (§231) | PD-A on one, PD-B on the other; UPS units plug directly into wall (§231) | **SE11-DEC-19: ADOPT WITH ENGINEERING CONSTRAINT** — circuit separation is mandatory; verification and any new circuit work is performed by a qualified electrician (SE11-REQ-10); this document designs nothing electrical |
+
+### 7.2 Circuit / load assumptions (from §231 and estimates)
+
+Seed figures: typical total draw ~560 W; sustained peak ~1,150–1,300 W across both domains (§231). SE11 estimate ranges (ASM-SE11-05, to be replaced by measurement SE11-AC-05/AC-08):
+
+| Load | Estimate (W) | Basis |
+|---|---|---|
+| CPU package (sustained) | 170–230 | §227.1 TDP / package limit |
+| Accelerator (if installed) | 0 or ≤ 145 | §227.11 |
+| 4× NVMe | 20–40 | class estimate |
+| DRAM, board, fans, NIC | 50–80 | class estimate |
+| **Central host total** | **~340–380 (no GPU) / ~480–530 (GPU)** | sum |
+| NAS (6 HDD steady, controller, 48 GB) | 80–150 steady; spin-up transient higher | class estimate |
+| **PD-A total** | **~420–530 (no GPU) / ~560–680 (GPU)** | ≤ 68 % of UPS-A rating at upper bound |
+| PD-B (rack, when it exists) | ≤ 600 | UPS-B rating |
+
+### 7.3 Device power envelopes and placement constraints
+
+- Central host: mid-tower, full-mesh front intake; keep ≥ 150 mm front and rear clearance; ambient within chassis/drive manufacturer limits (recorded as ASM-SE11-02: desk/room placement is an ordinary office environment, not a closet).
+- NAS: 8-bay desktop enclosure; same ambient assumption; placed on the same UPS-A battery outlets but on a separate network port and separate power cord.
+- Rack (deferred): 18U; §230 layout: 1U switch, 1U PDU, 1U power-brick shelf, worker trays; 17U used with a gap after every device or 12U without gaps for micro trays; modest spare U/port/power headroom (§230).
+- Heat: thermal validation SE11-AC-04 at full CPU load for 30 min; placement is revised if package temperature or clock behaviour fails SE11-NFR-10.
+
+### 7.4 Safe-shutdown dependencies (SE11-REQ-06)
+
+Sequence on UPS-A "on battery, low runtime" event: (1) host receives USB-HID event → scheduler sheds POOL-CENTRAL-BUILD / workers (§175); (2) Validation VM stops; (3) Core VM drains queues and stops; (4) Data VM flushes and stops; (5) host signals the NAS network-UPS client that host shutdown is complete, then the host powers off; (6) NAS shuts down last so every flush lands on durable storage. Order matters because the NAS must outlive the host; the measured end-to-end duration of steps 1–6 is the input to SE11-NFR-04. Hosted workers and external providers are unaffected but lose the control plane (FD-CENTRAL-HOST).
