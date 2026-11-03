@@ -527,3 +527,194 @@ Rules: (1) every workload in the Build VM — runners, containers, artifact serv
 
 **Decision rule (SE11-DEC-06).** Let V be SE12's modelled retention volume for the first two stages (D-IRR + D-BND copies at the retention policy, including snapshot overhead). Choose N-A if V ≤ 22 TiB (≈ 60 % of N-A usable); N-B if 22 TiB < V ≤ 44 TiB; above 44 TiB the answer is REV-STORAGE (architecture revision), not simply more drives; N-C if gate G-LOCAL fails for the NAS. If the NAS must be commissioned before the model exists, **N-A** is installed (H.1/H.3) and the choice is recorded as SE11-DEC-06a in the sizing document. **Six drives are never adopted on the strength of this document alone.**
 
+
+## 7. Network architecture (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-06)
+
+### 7.1 Physical links and roles
+
+| Link | Speed / media | Endpoints | Role |
+|---|---|---|---|
+| L1 storage/core | 10GBase-T, Cat6a | Host NIC (PCI_E3; PCI_E1 under Fallback A; PCI_E2 under Fallback C) ↔ switch ↔ NAS 10 GbE port 1 | Backup, artifact, database-dump, VM-archive transfers; "network capacity appropriate to measured artifact, backup, database, and build traffic" (§166); NAS shutdown command path under S-1 (§8.3) |
+| L2 management/upstream | 5 GbE onboard, Cat6a | Host onboard LAN ↔ switch | Host/VM management, upstream gateway, external-provider traffic |
+| L3 NAS secondary | 10 GbE port 2 (spare), 2×5 GbE | NAS ↔ switch | Expansion: second 10 GbE consumer or link redundancy; 5 GbE for the NAS management segment |
+| L4 worker links | 1 / 2.5 GbE (deferred) | Local workers ↔ switch access ports | "Worker links may be slower where sufficient" (§166) |
+| L5 uplink | per upstream gateway | Switch ↔ gateway | Internet; external AI providers; hosted runners; T3 transfers |
+| Wi-Fi 7 / Bluetooth | — | Host (disabled) | Not part of the architecture; disabled in firmware (§13) |
+
+SE11-REQ-04: L1 sustains ≥ 0.7 GB/s host↔NAS during concurrent build-cache activity, and shared storage or control paths are not the first bottleneck during concurrent transfers (§166) — SE11-NFR-02, verified in SE11-AC-05 for the NIC slot actually in use (Fallback C is admissible only if this passes).
+
+### 7.2 Switching / core role
+
+The switch (B17 class) is the single core: managed, VLAN-capable, at least 2×10 GbE (seed minimum, §230) with ≥ 4×10 GbE preferred so that host, NAS primary, NAS secondary and one future 10 GbE consumer fit without replacement (SE11-ADR-07); 24 access ports at ≥ 1 GbE for workers, management devices and the gateway. It is adopted ahead of the rack (conflict C4) because the management segment and VLAN enforcement need it. Until the switch is installed, an interim point-to-point 10 GbE link host↔NAS with L2 to the gateway is acceptable *placement* — not architecture — because all addressing is by DNS name and VLAN membership is a configuration attribute (§233 H.2); in that interim the S-1 NAS shutdown command runs over the point-to-point link, which removes the switch from the shutdown path. Power: the switch is on PD-A (conflict C1; §165 names "critical network components" among the PC+NAS UPS loads).
+
+### 7.3 Segmentation (SE11 designs the physical segments, VLAN membership and addressing; SE17 owns the security policy applied between them, SE11-DEP-05; SE14 is consulted for portable naming)
+
+| Segment | Members | Purpose | Policy owner |
+|---|---|---|---|
+| `seg.mgmt` | Host management interface, NAS admin, switch management, UPS software endpoint, SE11 telemetry exporter endpoint (§10.3) | Administrative plane; MFA-protected access (§59); no workload traffic; carries the S-1/S-2 shutdown signalling and N1 wake frames | SE17 (SE11-SECREQ-03) |
+| `seg.storage` | Host 10 GbE, NAS 10 GbE | Backup/artifact traffic only; not routed to workers | SE17 |
+| `seg.platform` | Core VM, Data VM, runtime namespaces | Stable runtime east-west | SE17 |
+| `seg.build` | Build VM, Validation VM, member containers | Build/test east-west; fault injection confined here | SE17 |
+| `seg.worker` | Local workers (deferred), hosted-runner VPN/egress | Disposable execution | SE17 |
+| `seg.egress` | Gateway-facing | Default-deny disclosure gateway for external model inputs (§66, §185) sits on this boundary | SE17 / EL |
+
+### 7.4 East-west traffic and bottleneck avoidance
+
+- Build artifacts move Build VM → artifact store (same device, M2_2) over the host-internal virtual switch; only archival copies cross L1 to the NAS, scheduled by SE20 outside peak build windows.
+- Database backups cross L1 off-peak; restore drills (§14) measure actual throughput to replace §6.4 assumptions.
+- Worker-to-core control traffic is small; worker artifact pulls are served from the host artifact store, not the NAS.
+- Management (`seg.mgmt`) and storage (`seg.storage`) traffic never share a VLAN; the NAS shutdown command is a management-plane flow.
+
+### 7.5 Expansion ports / headroom
+
+Free after baseline: NAS 1×10 GbE + 2×5 GbE; host 2×USB4 (emergency 10 GbE/NVMe adapters); switch access ports per §7.2. Triggers in §12.2.
+
+## 8. Physical power / placement architecture (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07)
+
+### 8.1 Power domains
+
+| Domain | UPS | Circuit (requirement, not design) | Loads | Status |
+|---|---|---|---|---|
+| PD-A | UPS-A, class B15 (1500 VA / 1000 W, pure sine, line-interactive AVR, 6 battery outlets, USB HID) | Circuit A: separate 15 A breaker; UPS plugged directly into wall (§231) | Central host, switch; NAS in S-1/S-2 | ADOPT WITH ENGINEERING CONSTRAINT |
+| PD-N | UPS-N, class B16 (≥ 1000 VA / 600 W pure sine, USB HID) — **only under candidate S-3** | Circuit A or B as the electrician decides under SE11-REQ-10 | NAS only | Conditional (SE11-DEC-10) |
+| PD-B | UPS-B, class B16 | Circuit B: second separate 15 A breaker (§231) | Rack PDU → local workers (and the switch only under S-3, conflict C1) | DEFER / OPTIONAL with the rack |
+
+Isolation rule (§165): worker/rack power is isolated from the host/NAS UPS so a worker fault or overload cannot drop the durable tier. The upstream gateway is placed on PD-A only if the measured PD-A load leaves the runtime reserve of §8.4 intact; otherwise it is powered separately (its loss during an outage is acceptable: no shutdown sequence depends on it).
+
+### 8.2 Device power envelopes and circuit/load assumptions
+
+| Device | Envelope used for planning | Source / assumption |
+|---|---|---|
+| Central host, no GPU | ~350–480 W peak at wall (CPU package ≤ 230 W + board/memory/4×NVMe/fans/NIC + PSU losses); host-only idle/boot ~100–150 W | B1, B7; ASM-SE11-05, replaced by SE11-AC-06 measurement |
+| Central host, with GPU | +145 W → ~500–630 W peak | B11 |
+| NAS, 4–6 HDD + 2 M.2 | ~70–150 W (spin-up transient higher) | B12/B14 class; ASM-SE11-05 |
+| Switch (+ gateway if on PD-A) | ~30–80 W | class estimate, ASM-SE11-05 |
+| PD-A total | ~450–710 W without GPU; ~600–860 W with GPU (S-1/S-2); ~380–560 W / ~530–710 W under S-3 (NAS on PD-N) — below the 1000 W rating, but battery runtime at these loads is minutes: UPS-A is a controlled-shutdown device, not a ride-through supply (§165) | SE11-AC-06 verifies |
+| Whole installation | Seed figures: typical ~560 W, sustained peak ~1,150–1,300 W when the rack is present (§231) | Circuit-sizing input for the electrician |
+
+SE11-REQ-10 (qualified-professional requirement; code-regulated work is not designed here): a licensed electrician verifies that circuits A and B are separate branch circuits of adequate rating for the measured/peak loads above, that receptacles, grounding and surge arrangements meet local code, and whether the optional dedicated 20 A circuit (§231) is warranted; SE11 supplies only the load figures and the two-domain requirement.
+
+### 8.3 Safe-shutdown signalling, per-candidate timed sequences and restart (SE11-DEC-07, SE11-DEC-10, SE11-DEC-13, SE11-DEC-17; corrects finding 006)
+
+**Signalling topology — gated decision (SE11-DEC-10, conflict C3).** The corpus names two integration surfaces: "automatic graceful shutdown via PowerPanel / NAS UPS service" on the UPS (§229.1) and "UPS support / network UPS server" on the NAS (§228.1). It does **not** establish any protocol/client/version combination between them. SE11 records three candidates and a gate:
+
+| Candidate | Topology | Cross-device integration required | Status |
+|---|---|---|---|
+| S-1 (preferred) | UPS-A USB-HID → central host running the UPS vendor's host shutdown software; the host orchestrates VM shutdown and issues an authenticated remote shutdown command to the NAS over `seg.mgmt` | Host↔UPS: vendor software on the host OS version; host→NAS: a remote shutdown interface supported by the NAS OS | Gated by SE11-AC-01 evidence (dated vendor documentation for both interfaces at the exact versions; FC-09) |
+| S-2 | UPS-A USB-HID → NAS as network UPS server; host as network client | NAS server protocol ↔ a host client implementing it | Gated by SE11-AC-01 evidence (FC-09) |
+| S-3 (protocol-agnostic fallback) | Two UPS units, each with its own USB-HID path: UPS-A → host; UPS-N (class B16) → NAS | None across devices | Adopted automatically if neither S-1 nor S-2 produces evidence; recorded as a new SE11-DEC (topology substitution of B15) |
+
+No shutdown sequence is relied on until the selected candidate has passed SE11-AC-06, SE11-AC-14 and SE11-AC-15.
+
+**Common parameters (defaults; SE11-AC-06/15 replace them with measured values):** T_hold = 60 s (on-battery hold before the sequence starts; 0 s when battery charge < 50 %, see restart rules); VM graceful-stop timeouts Build 60 s, Validation 60 s, Core 60 s, Data 90 s, then forced stop (a forced stop marks the VM "unclean" so that its filesystem/database integrity check runs before services start on the next boot); host OS shutdown ≤ 60 s; NAS own shutdown ≤ 120 s; NAS command acknowledgment ≤ 15 s, one retry (≤ 15 s), then proceed regardless; margin M = 30 s. **Once S2 is entered the sequence is never aborted**, including by mains restoration (deterministic, bounded); restoration is handled by the restart mechanisms below. Serial order Core → Data is kept because Core services depend on Data; Build and Validation stop in parallel with each other and with the NAS command.
+
+**Candidate S-1 — timed sequence (t = 0 at S2 entry = T0 + T_hold):**
+
+| t (s) | Host path (serial unless marked ‖) | NAS path (concurrent) |
+|---|---|---|
+| 0 | `SIG-SHUTDOWN` published ‖ send NAS shutdown command (ack ≤ 15 s; retry once by t = 30; proceed regardless) ‖ graceful stop Build and Validation (timeout 60) | Command received by t ≤ 30 |
+| 60 | Build, Validation stopped (forced if needed) → graceful stop Core (timeout 60) | NAS shutdown in progress (≤ 120 s from receipt) |
+| 120 | Core stopped → graceful stop Data (timeout 90) | NAS off by t ≤ 150 |
+| 210 | Data stopped → host issues the restart-mechanism command (M1: D_off = 120 s; or arms the M3 alarm) → host OS shutdown (≤ 60) | — |
+| 270 | Host off (**host critical path 270 s**) | — |
+| 330 | (M1 only) UPS-A outputs drop: 60 s after the last device off | — |
+
+UPS-A critical path from S2 entry = max(host 270, NAS 150) = **270 s**. **B_A(S-1) = T_hold 60 + 270 + M 30 = 360 s** → required measured runtime **R_A ≥ 360 / 0.7 = 515 s (8.6 min)** at the measured PD-A load (host + NAS + switch). The M1 output drop at 330 is outside the budget: if the battery exhausts before 330 the outputs drop anyway and the exhaustion-and-return path applies.
+
+**Candidate S-2 — timed sequence (NAS is the UPS server; the host is its client):**
+
+| t (s) | NAS path | Host path |
+|---|---|---|
+| −60 … 0 | NAS detects on-battery at T0 (detection ≤ 10 s), notifies the host; both hold T_hold = 60 s | Host receives on-battery notification, publishes `SIG-ONBATTERY` |
+| 0 | NAS enters its own S2: waits for the host's "client shutdown complete" message for at most W_nas = 240 s | Host sequence identical to S-1 rows 0–210 (Build‖Validation 0–60, Core 60–120, Data 120–210) |
+| 210 | — | Host sends "client shutdown complete" to the NAS, arms M3 if M3 is the mechanism, starts host OS shutdown |
+| 240 | W_nas elapses (host confirmation arrived at 210; if it never arrives the NAS proceeds anyway) → NAS issues M1 (D_off = 180 s) → NAS shutdown ≤ 120 s | Host off by 270 |
+| 360 | NAS off (**UPS-A critical path 360 s**) | — |
+| 420 | (M1 only) UPS-A outputs drop: 60 s after the last device off | — |
+
+**B_A(S-2) = 60 + 360 + 30 = 450 s** → **R_A ≥ 643 s (10.7 min)**. If the NAS OS cannot wait ≥ 240 s for the client, S-2 is not admissible (the host would lose power mid-sequence) — an SE11-AC-01 check.
+
+**Candidate S-3 — two independent sequences:**
+
+| UPS | Sequence | Critical path | Budget | Required runtime | M1 command / output drop |
+|---|---|---|---|---|---|
+| UPS-A (host + switch) | As S-1 host path without the NAS command: Build‖Validation 0–60, Core 60–120, Data 120–210, M1/M3 + host shutdown 210–270 | 270 s | **B_A(S-3) = 60 + 270 + 30 = 360 s** | **R_A ≥ 515 s** at PD-A load (host + switch) | Host commands at 210, D_off = 120 → drop at 330 |
+| UPS-N (NAS only) | NAS on-battery at T0 → T_hold 60 s → NAS issues M1 → NAS own shutdown ≤ 120 s | 120 s | **B_N = 60 + 120 + 30 = 210 s** | **R_N ≥ 300 s (5 min)** at the measured NAS load — measured separately in SE11-AC-06 | NAS commands at 60, D_off = 180 → drop at 240 |
+
+The NAS shutting down before the host is harmless: no shutdown step of the host depends on the NAS, and in-flight backup jobs are resumable (§175). Restart ordering (NAS reachable before the Data VM starts) is handled in S6 below.
+
+**State machine (all candidates; the timed sequences above are the content of S2/S3):**
+
+| State | Entry event | Actions | Bounded exit |
+|---|---|---|---|
+| S0 ONLINE | mains and UPS communication healthy | normal operation; UPS telemetry sampled ≤ 60 s | — |
+| S1 ON-BATTERY (hold) | E1 mains loss at T0 | publish `SIG-ONBATTERY` (the scheduler stops admitting `pool.build`/`pool.background` work — EL/SE01 policy, SE11-DEC-11); alert SE20 | E2 mains restored before T0 + T_hold → S0 and `SIG-ONBATTERY` cleared; else E3 → S2 |
+| S2 SHUTDOWN-INITIATED | E3: T0 + T_hold elapsed, **or** UPS low-battery, **or** UPS runtime estimate < B_u for that UPS, **or** E4 UPS-communication loss while in S1 (fail-safe: proceed) | the candidate's timed sequence; **never aborted** | → S3 within the candidate's host critical path (270 s) |
+| S3 HOST-OFF | host power off | NAS completes its own path (S-1: off by t = 150, already done; S-2: off by t = 360; S-3: independent) | → S4 |
+| S4 ALL-OFF | all devices halted; UPS output may still be live if mains returned during S2/S3 | M1: outputs drop at the commanded time and re-energise on mains; M3: the wake-poll loop runs; otherwise attended | → S5 |
+| S5 RESTART-PENDING | E5: AC applied to the devices (exhaustion-and-return, or M1's output cycle), **or** an M3 wake that finds mains online | host firmware "restore on AC power loss = power on" and NAS "power-on after AC recovery" bring both up (M3: host wakes by RTC; NAS by N1); host UPS software reads mains state and battery charge | → S6 when mains online **and** charge ≥ 50 % **and** estimated runtime at current charge ≥ B_u / 0.7; until then the host stays in HOST-ONLY (no VM auto-start) with T_hold = 0 so that a second mains loss triggers an immediate host-only shutdown (B_hostonly = 0 + 60 + 30 = 90 s, needing R ≥ 130 s). Time spent waiting for charge is logged as *charge-limited restart* and is excluded from T_restart |
+| S6 RESTARTED | charge and runtime conditions met | VM auto-start order with delays: Data (0 s) → Core (60 s) → Validation (120 s) → Build (180 s) = T_ready 180 s; the host waits up to 300 s for NAS reachability before Data VM services start, then proceeds (backups retry); unclean VMs run integrity checks first; SE20 post-event check of backups, telemetry and protection states | → S0 |
+
+**Restart mechanisms (SE11-REQ-15, SE11-REQ-20, SE11-DEC-13, SE11-DEC-17).** Firmware AC-recovery settings act only when the device's AC input is actually removed and restored. If mains returns while the UPS output stays live (during S2, S3 or S4), nothing in firmware re-powers a halted device. One of the following mechanisms must be commissioned, in this order of preference, and the selected one recorded in the configuration fingerprint. Timing constants (ASM-SE11-13, replaced by SE11-AC-15 measurements): T_boot = 120 s (AC applied or RTC wake → host UPS software able to read UPS state), T_decide = 30 s, T_hostonly_off = 90 s, W = 300 s (wake-poll period), D_on = 60 s (UPS output restart delay once mains is present and outputs are off), T_ready = 180 s.
+
+| Mechanism | How it works | Covers | Admissible for SE11-REQ-15? | Gate |
+|---|---|---|---|---|
+| **M1 — commanded output power-cycle (mandatory if evidenced)** | The device that owns the UPS link (host in S-1/S-3, NAS in S-2; each device for its own UPS in S-3) commands: "turn outputs off after D_off; restart outputs when mains is present (and battery ≥ the UPS's restart threshold)". **D_off = (worst-case last-device-off time on that UPS − command time) + 60 s guard**, per candidate: S-1 120 s (drop at 330), S-2 180 s (drop at 420), S-3 UPS-A 120 s (330) / UPS-N 180 s (240). Every device thus sees a real AC loss; when mains is already back the UPS re-energises after D_on and firmware AC-recovery fires on host and NAS → S5 | Restoration at any time during S2/S3/S4, and the exhaustion case | Yes (host and NAS) | SE11-AC-01: dated vendor evidence that the UPS class and the commanding software support commanded output shutdown with auto-restart (FC-09); SE11-AC-15 drill |
+| **M3 — wake-poll loop (alternative where M1 is not evidenced)** | At the host OS shutdown command in S2 (t = 210), and again at **every** subsequent host-only shutdown while the UPS reports on-battery or unknown, the host arms a firmware RTC alarm at now + W. On wake the host boots HOST-ONLY, reads the UPS within T_boot + T_decide: *mains online* → S5 (charge rule) → S6, and the host sends N1 (Wake-on-LAN) to the NAS; *on-battery or unknown (E4)* → host-only shutdown (T_hostonly_off) and **re-arm**. The loop ends only when a wake finds mains online or the UPS exhausts; after exhaustion the AC-input-cycle path restarts host and NAS when mains returns, and any pending alarm is irrelevant. **No attempt cap** — a cap would reopen the "halted indefinitely" gap. Cost: each cycle draws host-only power for ≈ T_boot + T_decide + T_hostonly_off = 240 s per 540 s, accelerating exhaustion (SE11-RISK-14); accepted because after S3 no workload runs and no unflushed data exists, and exhaustion leads to the robust AC-cycle path | Host restoration at any time; NAS via N1 while UPS output is live, via AC cycle after exhaustion | **Host: yes.** NAS: **only with N1 evidenced** (or the NAS on UPS-N under S-3 with its own M1). **M3 without an evidenced NAS wake is ATTENDED-ONLY for the NAS and inadmissible for SE11-REQ-15** (recorded as FD-RESTART exposure, SE11-RISK-12) | SE11-AC-01 (RTC wake from soft-off on the board class, N1 WOL on the NAS class; FC-09); SE11-AC-15 drills (a)–(e) |
+| **M4 — attended restart (residual)** | No automatic restart; SE20 is alerted (the UPS software's last message before shutdown and the absence of the expected S5 telemetry) and an operator powers the devices on | Everything, with human latency | **No** — ATTENDED-ONLY; inadmissible for SE11-REQ-15; blocks any stable-runtime baseline whose SLO requires unattended recovery | Recorded as FD-MGMT/FD-RESTART exposure (SE11-RISK-12); REV-POWER if an SLO (§117) requires unattended restart |
+
+**End-to-end restart timing budget (SE11-REQ-20; T_restart = mains restoration → S6 entry, given charge ≥ 50 % at restoration; otherwise charge-limited and logged):**
+
+| Scenario | M1 (S-1 / S-3) | M1 (S-2) | M3 (any candidate, host) |
+|---|---|---|---|
+| (a) Restoration at S2 entry (t = 0; worst case) | drop 330 + D_on 60 + T_boot 120 + T_decide 30 = **540 s** | drop 420 + 60 + 120 + 30 = **630 s** | alarm armed at 210 fires at 510 + 120 + 30 = **660 s** |
+| (b) Restoration after outputs are off (M1) / immediately after an unsuccessful on-battery wake decision with output still energised (M3) | D_on 60 + 120 + 30 = 210 s | 210 s | host-only shutdown 90 + re-armed W 300 + 120 + 30 = **540 s** worst (restoration just after the decision); 450 s if measured from the re-arm |
+| (c) Restoration during an M3 host-only boot | n/a | n/a | ≤ T_boot + T_decide = 150 s |
+| (d) Restoration after UPS exhaustion | UPS restart on mains (class threshold) + 120 + 30 | same | same (AC-cycle path) |
+| **Bound** | **T_restart ≤ 720 s (12 min)** holds for every scenario of every admissible mechanism; VM readiness adds T_ready 180 s → full service ≤ 15 min | | |
+
+The v3 bound of 10 min is withdrawn: it was not derivable for restoration at S2 entry under any mechanism. Rule: **if M1 is evidenced it is mandatory**; M3 is used only where M1 is not; M4 is never a pass for SE11-REQ-15.
+
+**Communication-loss handling (E4).** Loss of host↔UPS communication while in S0: alert; if it persists > 300 s the UPS protection is declared degraded (SE20 ticket, no workload change). If mains then fails while communication is still lost, the host has no event and the outcome is an **abrupt loss** (handled as FD-UPS-A, §9) — this residual is accepted and tested (SE11-AC-14). Loss of the NAS command path (switch or NAS unreachable) in S-1 S2: proceed; the NAS stops uncontrolled at UPS exhaustion — accepted residual with CoW crash-consistency and a mandatory scrub on restart (SE11-NFR-07). In S-2, loss of the NAS→host notification path is equivalent to E4 for the host. At an M3 wake, an unreadable UPS is treated as on-battery (shutdown and re-arm).
+
+**Shutdown budget rule (SE11-REQ-06, SE11-NFR-03).** For every UPS u of the selected candidate: B_u ≤ 0.7 × R_u, where R_u is the measured runtime at the measured load of that UPS's domain. Default budgets: S-1 B_A = 360 s; S-2 B_A = 450 s; S-3 B_A = 360 s and B_N = 210 s. The 30 % reserve is held *against measured runtime*, not against the low-battery signal; the low-battery signal and the runtime estimate are additional triggers only.
+
+### 8.4 Fail-closed commissioning outcome
+
+SE11-AC-06 **fails** if, for any UPS of the selected candidate, R_u < B_u / 0.7 at the measured load, or if any step exceeds its bound in the drill, or if no admissible restart mechanism meets T_restart ≤ 720 s in SE11-AC-15 (M4 is a fail for any baseline whose SLO requires unattended recovery; M3 without an evidenced NAS wake is a fail for the NAS). Ordered remedies, each recorded as an SE11-DEC when applied: (1) remove non-essential loads from PD-A (gateway first; the switch stays while the S-1 command path needs it); (2) shorten VM stop timeouts only with SE11-AC-13 evidence that clean stops complete within the shorter bound; (3) change candidate (S-2 → S-3 shortens B_A from 450 s to 360 s and moves the NAS load off UPS-A); (4) substitute UPS-A by a higher-runtime unit of the same specification class (§11.4); (5) if none suffices, REV-POWER (§12.3). Until SE11-AC-06 passes, no stable-runtime stage baseline is accepted on this hardware (§154 evidence progression) and the platform stays in `PL-T2` at most (§6.3).
+
+### 8.5 Placement constraints (rack / desk / room)
+
+- Central host: tower chassis free-standing with unobstructed mesh-front intake and rear exhaust, off the floor, on PD-A; not inside the 18U rack (rack is for workers/switch/PDU per §230).
+- NAS: adjacent to the host, on PD-A (S-1/S-2) or PD-N (S-3), within Cat6a reach of the switch; 3.5-inch drives are vibration-sensitive — solid surface, never stacked on the host.
+- Switch: rack-mounted when the rack exists; until then shelf-mounted next to the NAS on a PD-A battery-backed outlet.
+- Rack (deferred): 18U; 17U used with a gap after every device or 12U without gaps for micro trays (§230); 1U switch, 1U PDU, 1U power-brick shelf, trays sized to the selected worker form factor; PD-B feeds the PDU.
+- Room: lockable (§13), ambient within device operating ranges, no shared circuit with high-draw appliances (requirement to the electrician under SE11-REQ-10); the T3-SUB medium is stored outside this room (§6.3); thermal and rack layout detail belongs to SE11-POWER-COOLING-RACK.
+
+## 9. Failure-domain design (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-08)
+
+Common-mode failure domains are named explicitly so that every consuming document references them by id (SE11-REQ-11). Redundancy "must cover actual shared failure points such as network, power, storage, control plane, DNS, external AI/provider dependencies, and internet connectivity — not merely worker count" (§173). Every domain has an accountable owner, a recovery dependency, a measurable acceptance target and a residual disposition; all dispositions are PROV (§0.2). Protection-state references are to §6.3.
+
+| Domain id | What fails together | Blast radius in the reference configuration | Mitigation in this architecture | Accountable owner | Recovery dependency | Acceptance target | Residual disposition |
+|---|---|---|---|---|---|---|---|
+| FD-HOST | Board, CPU, memory, PSU | All four VMs, all local pools, WSL2; elastic workers lose their coordinator | Hardware-independent definitions (SE11-REQ-05); NVMe portable to a replacement host of the §11.4 class; T2/T3 copies; hosted fallback (§160, §168); queued disposable work idles rather than fails (§175) | SE11 (hardware), EL (architecture residual, SE11-DEP-02) | Replacement host class or hosted fallback; T2 (T3 if NVMe also lost) | SE11-NFR-06: degraded service ≤ 1 working day (ASM-SE11-07) | Accepted at Stage 1–2 pending EL; REV-HA when an SLO requires survival |
+| FD-NVME-M2_1 | Host system device | All VMs stop until host OS rebuilt; VM disks intact | Version-controlled host build; spare device class | SE11, SE20 | Spare NVMe; host build definition | Host rebuilt and VMs restarted without T2 restore | Accepted; same class as FD-HOST but shorter |
+| FD-NVME-M2_4 | Core + Data VM disks, platform data | **Full platform outage** (control plane and data) | Device isolation (only Highest-priority); hourly snapshots to T2 | SE11, SE12 | T2 (T2-only recovery) | SE11-NFR-05: restore ≤ 4 h per VM, loss ≤ 1 h | Accepted at Stage 1–2; reviewed at REV-HA |
+| FD-NVME-M2_2 | Build VM disks, artifacts (Validation too under Mapping-D; scratch too when on M2_2) | Build/validation outage; runtime continues | Isolation from M2_4; T2 archives; rebuild from definitions | SE11, SE12 | T2 or rebuild | Restore ≤ 4 h; D-BND loss within SE12 window | Accepted |
+| FD-NVME-M2_3 | Scratch (Mapping-D) or Validation (Mapping-V) | Slower builds, or validation outage under Mapping-V | Fallback mapping (§6.1a); T2 for Validation data | SE11 | none / T2 | Cache rebuilt / Validation restored ≤ 4 h | None material / accepted |
+| FD-WORKER | One or more workers (local or hosted) | Capacity reduction only (§172) | Multiple eligible execution targets; no critical service on one uniquely named worker (§172) | EL (placement), SE01 | none | Queue drains on remaining capacity | None material |
+| FD-STORAGE | NAS enclosure / array | Backups pause; T1 keeps running; D-IRR classes whose T3 pipeline passes through the NAS begin ageing | RAID 6; snapshots; T3; T2 never a live datastore; protection states (§6.3) | SE11 (hardware), SE12 (data) | T3 for D-IRR; replacement enclosure of the §11.4 class | No D-IRR loss beyond `age(c)` (COPY) or the class's bounded existence (ANCHOR); degraded window ≤ A_max + G per class | Accepted in `PL-T3`; in `PL-T2` no real D-IRR data exists; `PL-T3-PENDING`/`PL-DEG`/`PL-EXP` exposure bounded and logged |
+| FD-SWITCH | Core switch / its uplink ports | L1, L2, L4, L5; host and NAS lose each other and the internet; VMs keep internal connectivity via the virtual switch; S-1 NAS command path and N1 wake frames lost unless point-to-point | Interim point-to-point L1; spare NAS ports; cold-spare switch of equivalent class is an SE20 stocking decision; S-3 removes the command-path dependency | SE11 | Replacement switch class | Backups resume within the SE12 window after replacement; no runtime data loss | Accepted: single switch at Stage 1–2 |
+| FD-CIRCUIT-A | Mains/circuit A interruption **with healthy UPS-A** | Host, switch (and NAS in S-1/S-2) run on battery → controlled shutdown (§8.3) | State machine S1–S6; per-candidate budgets SE11-REQ-06; restart mechanism SE11-REQ-15/20; AVR | SE11, SE20 (drills); electrician for cause (SE11-REQ-10) | none beyond UPS | SE11-NFR-03 met in SE11-AC-06/15; automatic restart within T_restart ≤ 720 s | Accepted: outage = planned-quality downtime, no data loss beyond in-flight work |
+| FD-UPS-A | **Abrupt UPS-A output loss** (UPS fault, overload trip, battery failure) or mains loss while UPS communication is lost | Host and switch (and NAS in S-1/S-2) lose power **simultaneously and without warning** | Crash-consistency requirements: journaled guest filesystems, synchronous-commit WAL (SE12), NAS copy-on-write + scrub on restart; restart S5–S6; integrity checks before services start | SE11 (hardware), SE12 (data integrity) | Spare UPS of the §11.4 class; integrity tooling | SE11-NFR-07 met in SE11-AC-13 | Accepted: client-class NVMe without asserted power-loss protection (§6.5); loss bounded to last commit; REV-POWER if drills show unrecoverable corruption |
+| FD-UPS-N (S-3 only) | Abrupt UPS-N output loss | NAS only | NAS CoW + scrub | SE11 | Spare UPS class | NAS array integrity after drill | Accepted |
+| FD-SIGNAL | UPS signalling path only (USB cable, UPS software, NAS command/notification path) | No immediate workload impact; a later mains loss degrades to FD-UPS-A | E4 handling (§8.3); S-3 topology as fallback; telemetry alert | SE11, SE20 | none | Detected ≤ 300 s; drill SE11-AC-14 passes | Accepted with alerting |
+| FD-RESTART | Restart mechanism fails after a shutdown (M1 not executed, RTC alarm not firing, WOL not received) | Devices stay halted although mains is back | M1 preferred; M3 wake-poll loop re-arms until mains or exhaustion; exhaustion-and-return as the ultimate path; M4 residual (§8.3) | SE11, SE20 | Operator presence (M4) | SE11-AC-15: T_restart ≤ 720 s for the selected mechanism in drills (a)–(e) | Accepted only with M1, or M3 + evidenced NAS wake; otherwise recorded exposure (SE11-RISK-12) |
+| FD-UPS-B / FD-CIRCUIT-B | UPS-B or circuit B (deferred) | Local workers only | Isolation from PD-A (§165) | SE11 | none | Capacity reduction only | n/a until rack exists |
+| FD-ROOM | Rack/room/site (fire, flood, theft) | Total local loss | T3 off-site copy per class; portability to hosted infrastructure (§160, §168) | SE11 (physical), SE12 (T3), EL (hosted fallback) | T3; hosted capacity | D-IRR restored from T3 with loss ≤ `age(c)` (COPY); service rebuilt on hosted/replacement infrastructure | Accepted in `PL-T3`; exposure in other PL states bounded by §6.3 |
+| FD-EXT-AI | External AI providers | `pool.agents` work needing external models; no offline AI until B11 adopted | Provider router/fallback and AI-dependency governance (§66, §115, §185); queued jobs resume (§175) | EL (AI/agent architecture, SE11-DEP-02) | Alternative provider per router policy | Queued work resumes without loss | Pending EL; NT16 vendor risk absent (SE11-DEP-09) |
+| FD-INTERNET | Uplink / gateway | External providers, hosted runners, hosted T3 transfers, mirrors | Local repositories/mirrors on T2 (§164); local build capacity in `pool.build`; **T3 tolerance = remaining copy-age budget per class (A_max − `age(c)` at outage start), then G of degraded operation, then T3-SUB or write-freeze (§6.3)** | SE11 (physical uplink), SE20 (operations), SE12 (policy) | Single uplink restored | Local runtime continues; protection-state transitions observed exactly as §6.3 prescribes (SE11-AC-07c) | Accepted: single uplink at Stage 1–2; exposure bounded and logged |
+| FD-MGMT | Management plane (host admin path, NAS admin, switch mgmt, UPS software, telemetry exporter) | Operator cannot intervene remotely; workloads unaffected; M4 restarts need presence; signal consumers see the contract's "stale" state (§18.2) | Physical console (§10.2); `seg.mgmt` isolation; configuration in version control | SE11, SE20 | Physical presence | Console recovery procedure drilled once per stage | Accepted: no BMC on the consumer-class board (SE11-RISK-04); REV-HA if SLOs require remote recovery |
+
+Dependency-failure behaviour summary: a local infrastructure problem must not corrupt active builds or accepted runtime state; resumable jobs, durable state and idempotent execution are required of every workload placed on these pools (§175) — EL/SE19 implement and prove this; SE11 guarantees only the physical boundaries above and publishes the signals of SE11-DEC-11 under the contract of §18.2.
+
