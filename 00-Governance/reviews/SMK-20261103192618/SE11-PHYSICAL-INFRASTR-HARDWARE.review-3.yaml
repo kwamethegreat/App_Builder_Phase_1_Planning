@@ -1,0 +1,95 @@
+---
+id: SE11-PHYSICAL-INFRASTR-HARDWARE
+version: 4
+status: complete
+owner: REVIEWER_EN
+based_on: [SE11-PHYSICAL-INFRASTR-HARDWARE, SEED-01]
+requirements: [ENV-DEC-017, SE11-REQ-12, SE11-REQ-16, SE11-GATE-04, SE11-GATE-06, SE11-AC-05]
+---
+run_id: SMK-20261103192618:SE11-PHYSICAL-INFRASTR-HARDWARE:review:3
+task_id: SE11-PHYSICAL-INFRASTR-HARDWARE
+reviewed_version: 3
+verdict: revise
+review_scope: >-
+  Engineering re-review of the supplied version 3, including its revision
+  responses, outline coverage, internal consistency and buildability.
+  Smoke-run exclusions applied: missing upstream documents, contract
+  registration, register identifiers and external verification are not defects.
+  SEED-01 section 229 was checked at repository sha
+  2d3a171d6961a8790f5a9812eeb1e3907f188242.
+criteria_assessment:
+  outline: All fourteen outline topics have explicit sections and dispositions.
+  quality: >-
+    All seven quality criteria are explicitly disposed. Coherent power and
+    shutdown implementation remains subject to the findings below.
+  boundaries: No procurement workflow or pricing is introduced.
+  hardware_chain: >-
+    The exact seed baseline and BOM dispositions are recorded. Memory sizing
+    is now conditional on workload inputs rather than the listed maximum.
+    Failure domains and their owners are explicit.
+  plans: Not applicable; this is a physical architecture document.
+re_review:
+  - id: REVIEWER_EN-SE11-PHYSICAL-01
+    assessment: Resolved by conditional memory classes and the pre-adoption sizing gate.
+  - id: REVIEWER_EN-SE11-PHYSICAL-02
+    assessment: >-
+      The fallback arithmetic and blind-path time origin are improved, but
+      the revised acknowledgement ordering and competing shutdown timers
+      still do not implement the stated acceptance assertions.
+  - id: REVIEWER_EN-SE11-PHYSICAL-03
+    assessment: >-
+      Double counting is removed and the installed-PSU headroom limit is
+      recomputed. The revised UPS substitution response still leaves its
+      acceptance ratings fixed to the original unit.
+  - id: REVIEWER_EN-SE11-PHYSICAL-04
+    assessment: Resolved by distinguishing negotiated link speeds and reconciling port budgets.
+findings:
+  - id: REVIEWER_EN-SE11-PHYSICAL-02
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07
+    source_or_requirement_id: SE11-REQ-16
+    description: >-
+      Section 7.5 does not implement its shutdown ordering assertions. It
+      defines the acknowledgement as a message sent before host power-off,
+      but starts NAS shutdown immediately on receipt and asserts that this
+      is necessarily at or after host power-off. A pre-power-off message
+      cannot establish that ordering; SE11-AC-05(a) can fail with an intact
+      signal path. The revised during-loss example also contradicts the
+      ON-BATTERY timer: observation at 20 s and T_ob of 30 s require shutdown
+      initiation by 50 s, whereas the example and drill (e) require initiation
+      at t_L + T_stale = 100 s. No precedence or irreversible shutdown latch
+      resolves these competing instructions.
+    required_correction: >-
+      Separate acknowledgement transmission from actual host power-off.
+      Preserve host-before-NAS ordering using an explicit bounded delay or
+      the already bounded host-completion deadline before NAS initiation;
+      account for the chosen mechanism in the runtime inequalities and
+      no-acknowledgement fallback. Specify that shutdown initiation is
+      irreversible and occurs at the earliest applicable deadline, with a
+      previously armed ON-BATTERY deadline never postponed by signal loss.
+      Correct the worked timeline and drills to exercise signal loss both
+      before and after shutdown initiation, and align SE11-GATE-06 and
+      SE11-AC-05 with those observable events.
+  - id: REVIEWER_EN-SE11-PHYSICAL-03
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07
+    source_or_requirement_id: SE11-GATE-04
+    description: >-
+      The revised loading-failure response in section 7.3(c) substitutes a
+      larger UPS and repeats the gate, but the gate still requires projected
+      load to be at most 80 percent of 1000 W and 1500 VA. Those fixed original
+      ratings also remain in section 10.3. Unlike L_PSU, no installed-UPS
+      rating replaces them after substitution. For example, an 850 W load
+      fails the original 800 W limit and still fails it after installing the
+      stated 1300 W-class alternative, despite being below 80 percent of
+      that alternative's rating. The documented remedy cannot close its gate.
+    required_correction: >-
+      Define inventory-backed installed UPS output ratings in W and VA and
+      express loading admission against 80 percent of those installed
+      ratings. Keep 1000 W and 1500 VA as baseline values only. On UPS
+      substitution, update both ratings and remeasure the runtime-versus-load
+      curve, shutdown durations and relevant drills before repeating admission.
+      Align sections 7.1, 7.3, 9.1, 10.3 and SE11-AC-05, and include a worked
+      loading-failure substitution that can actually pass the revised gate.
