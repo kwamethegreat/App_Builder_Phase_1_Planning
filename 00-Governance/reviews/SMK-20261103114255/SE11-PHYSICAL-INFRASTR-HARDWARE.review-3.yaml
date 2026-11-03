@@ -1,0 +1,188 @@
+---
+id: SE11-PHYSICAL-INFRASTR-HARDWARE
+version: 4
+status: complete
+owner: REVIEWER_EN
+based_on: [SE11-PHYSICAL-INFRASTR-HARDWARE, SEED-01]
+requirements: [ENV-DEC-017, SE11-REQ-14, SE11-REQ-15, SE11-REQ-16, SE11-REQ-17, SE11-DEC-03, SE11-DEC-14]
+---
+run_id: SMK-20261103114255:SE11-PHYSICAL-INFRASTR-HARDWARE:review:3
+round_id: SMK-20261103114255
+task_id: SE11-PHYSICAL-INFRASTR-HARDWARE
+reviewed_version: 3
+verdict: revise
+review_basis:
+  - Target version 3 supplied in full in the run context.
+  - Required source PL-REQ-ID-REGISTER is explicitly missing in the supplied context; no register reconciliation or EL consistency is asserted by this review.
+  - SEED-01 section §227 read directly; repository sha 2d3a171d6961a8790f5a9812eeb1e3907f188242 confirms the cited central-compute reference BOM and source fingerprint.
+  - Re-review evaluated the corrections described in target §0.4. Prior review files were not supplied as readable dependencies.
+assessment: >-
+  Revise. Exact BOM provenance, explicit dispositions, failure-domain ownership,
+  aggregate sizing structure and separation of weighted contention from scheduler
+  shedding are present. Removal of the single-component automatic selection of
+  256 GB addresses the stated finding 002. Provisional labels and future acceptance
+  gates do not close missing source reconciliation, contract registration or
+  compatibility evidence. The revised reservation, storage-protection, restart and
+  protection-activation mechanisms also contain implementability defects.
+findings:
+  - id: REVIEWER-EN-SE11-PHYSICAL-001
+    severity: major
+    type: source_gap
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-01
+    source_or_requirement_id: PL-REQ-ID-REGISTER
+    description: >-
+      The prior source gap remains open. Sections 0.1, 0.3, 0.5 and 19 explicitly
+      say the required register was not consumed and every register mapping is
+      UNMET, but redefine covered to mean sought and absent. The corpus-silence
+      assumption procedure does not establish required-source coverage or permit
+      a machine-readable coverage value to mean its opposite. The seed crosswalk
+      is useful preparation, not reconciliation to the authoritative register.
+      The document itself prohibits implementation pending that reconciliation.
+    required_correction: >-
+      Remove the invented covered-means-absent interpretation and all claims that
+      the required-source outcome is satisfied. Close this finding only with
+      actual register requirement/decision mappings and an updated based_on list
+      after the required source is available; do not invent ids or source content.
+      Until then retain the source gap and non-implementation restriction and do
+      not represent this document as having passed source completeness.
+  - id: REVIEWER-EN-SE11-PHYSICAL-003
+    severity: major
+    type: dependency_inconsistency
+    outline_id: QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-06
+    source_or_requirement_id: SE11-CONTRACT-hardware-baseline@1
+    description: >-
+      The prior contract-discipline finding is not closed by renaming missing
+      interfaces unmet dependencies. Section 18.2 still provides an explicitly
+      unregistered contract. Sections 4, 6.3, 10.3 and 13 require scheduler signal
+      consumption, creation/mutation enforcement, telemetry integration and
+      security policy without owner-issued contract ids. Section 18.3 expressly
+      says write-freeze enforcement is unassigned. No cited contract makes these
+      cross-domain behaviours implementable, and no owner control-id mapping
+      supports the security requirements. The status restriction avoids a false
+      integration claim but does not satisfy contract discipline.
+    required_correction: >-
+      Register the provided contract through the designated SE11 and EL contract
+      artefacts and cite the registration. Bind each consumed cross-domain
+      behaviour to its owner's contract id and version, including enforcement,
+      signal delivery/failure semantics, telemetry and security-control mapping.
+      Keep unavailable interfaces explicitly unmet rather than treating dependency
+      labels as closure; do not fabricate owner contracts or approvals.
+  - id: REVIEWER-EN-SE11-PHYSICAL-004
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04
+    source_or_requirement_id: SE11-REQ-14
+    description: >-
+      The revised §5.3 decision procedure contradicts its own floors. Step 1 says
+      reallocation must preserve every pool's floor, but its worked M-A example
+      reduces Validation's minimum from the authoritative table's 8 GB to 6 GB
+      and Build's from 12 GB to 8 GB without a new workload-derived floor. This
+      makes the example pass by weakening the admission constraint. Step 3 also
+      permits expansion only when aggregate C fails Check 2, although Check 1 is
+      independently mandatory: F=110 GB and C=116 GB fails 1.25F<=128 while
+      passing C+8<=128. After reallocation and hosting fail, that case has no
+      selectable outcome under the stated procedure.
+    required_correction: >-
+      Preserve the recorded workload floors in the reallocation example, or
+      separately justify and validate changed floors before recomputing admission.
+      Define selection and expansion using both checks, for example required
+      capacity=max(1.25F,C+8), after the ordered reallocation/hosted evaluations.
+      Include examples for floor-only failure, ceiling-only failure and an
+      infeasible configuration, each with a deterministic disposition.
+  - id: REVIEWER-EN-SE11-PHYSICAL-005
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05
+    source_or_requirement_id: SE11-REQ-16
+    description: >-
+      Section 6.1a's new calibration rule does not preserve the capacity budget
+      it claims. V_min is max(1.5 times measured Validation demand,20% of D2),
+      while B_max remains 60% of D2 and at least 20% is claimed unallocated.
+      Any V_min above 20% violates that headroom allocation; a measured demand
+      of 40% of D2 produces V_min=60% and V_min+B_max=120% of D2. No general
+      admission or rebudgeting rule handles this case. In addition, the guest
+      fallback specifies aggregate limits across multiple devices but supplies
+      no per-device/cgroup allocation whose sum enforces B_max. Assigning the
+      stated maximum independently to each device would multiply the budget.
+    required_correction: >-
+      Define a calibration/admission rule that enforces V_min+B_max+headroom<=D2
+      and a deterministic response when measured demand cannot fit. Specify how
+      the aggregate Build IOPS and byte budgets are divided across all applicable
+      devices and cgroups, including root/system I/O, and verify their summed
+      traffic. Apply infeasibility remedies to every matrix row, not only the
+      double-fallback row. Extend AC-12b to exercise demand above the default
+      V_min and simultaneous traffic on every capped device.
+  - id: REVIEWER-EN-SE11-PHYSICAL-006
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07
+    source_or_requirement_id: SE11-REQ-15
+    description: >-
+      The new M3 restart fallback in §8.3 cannot meet its unconditional
+      restoration-to-S6 bound. It arms a wake alarm for ten minutes after the
+      pre-shutdown action, so mains restored early in S2 can precede the alarm
+      by more than ten minutes even before boot and readiness checks. If the
+      one permitted alarm fires while still on battery, the host shuts down
+      without rearming. Mains subsequently restored before UPS output loss
+      then produces neither a wake alarm nor an AC-input cycle, leaving the
+      platform halted indefinitely. This is the no-output-cycle failure the
+      revision claims to close. M1 timing is also inconsistent: the S-1 command
+      at t=210 plus D_off=90 drops output at t=300, only 30 seconds after host
+      off at t=270, whereas AC-15 requires approximately 90 seconds after host
+      off.
+    required_correction: >-
+      Define an evidenced restart mechanism that handles restoration before and
+      after an unsuccessful wake without requiring UPS exhaustion, or explicitly
+      classify those M3 paths as attended-only and inadmissible for the automatic
+      restart requirement. Derive one end-to-end timing budget including alarm,
+      boot and readiness latency, and reconcile M1 command/output timings with
+      AC-15 for every candidate. Add drills for restoration immediately after S2
+      entry and immediately after M3's unsuccessful on-battery wake while UPS
+      output remains energized.
+  - id: REVIEWER-EN-SE11-PHYSICAL-008
+    severity: major
+    type: outline_gap
+    outline_id: QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03
+    source_or_requirement_id: SE11-DEC-14
+    description: >-
+      The prior compatibility/availability outcome remains unmet. Sections 11.2
+      and 17 state that no manufacturer support or availability evidence exists,
+      AC-01 has not been performed and no configuration fingerprint exists.
+      Nevertheless §11.2 claims specification classes cannot be impossible or
+      obsolete and §19 marks the criterion covered by design change. Abstracting
+      a combination into requirements does not demonstrate that a current
+      supported combination exists. In particular, concurrent slots, memory
+      population, OS/driver support and shutdown/restart integration remain
+      unverified class-level feasibility conditions, not merely missing serial
+      numbers or post-build test results.
+    required_correction: >-
+      Remove the assertion that specification classes guarantee feasible/current
+      combinations and retain QC-AR-03 as unmet until dated, attributable pre-build
+      evidence demonstrates at least one coherent supported configuration or
+      supported alternative. Record the resulting baseline selection/fingerprint
+      and its exact evidence references separately from later commissioning
+      evidence. Do not fabricate manufacturer evidence or claim criterion closure
+      from deferral alone.
+  - id: REVIEWER-EN-SE11-PHYSICAL-009
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-05
+    source_or_requirement_id: SE11-REQ-17
+    description: >-
+      Section 6.3's replacement protection-state model has no legal bootstrap
+      transition. ABSENT means no dataset of the class exists; PROTECTED requires
+      datasets to exist. REQ-13 and REQ-17 permit creating the first dataset only
+      while the class is PROTECTED, and AC-07b requires copying/restoring that
+      class before its first dataset exists. Passing a mechanism test cannot
+      satisfy the defined PROTECTED state for an absent class. This also affects
+      INV, EVID and KEYS needed to produce commissioning evidence. An implementer
+      must invent an exemption or violate the creation invariant to commission
+      the first protected class.
+    required_correction: >-
+      Separate protection-mechanism readiness from protection of actual datasets.
+      Define an explicit bootstrap transition using synthetic test fixtures and
+      commissioned key custody, followed by admission/initial durable-copy
+      semantics for the first real dataset. State when actual copy timestamps
+      become valid and which service enforces the transition through its contract.
+      Reconcile the state table, REQ-13/17, platform states and AC-07b/07c, and add
+      a from-empty-platform activation test without unstated exemptions.
