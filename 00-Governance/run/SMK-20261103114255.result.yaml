@@ -1,0 +1,9 @@
+run_id: SMK-20261103114255
+state: FAILED_NONCONVERGENCE
+finished_at: 2026-11-03T15:21:17.657Z
+compiled_plan_commit: null
+task_counts:
+  FAILED_NONCONVERGENCE: 1
+failed_tasks:
+  - {task: SE11-PHYSICAL-INFRASTR-HARDWARE, status: FAILED_NONCONVERGENCE, review_cycles: 6, error: "non-convergence after 6 reviews", log: 00-Governance/run/SMK-20261103114255/failures/SE11-PHYSICAL-INFRASTR-HARDWARE.failure.md}
+blocked_tasks: []
