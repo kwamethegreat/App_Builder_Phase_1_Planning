@@ -619,3 +619,7 @@ None. No approved upstream document contradicts this architecture; the only tens
 | QC-…-AR-07 sign-off recorded against the exact baseline | Covered | §17 |
 
 Outline criteria OUT-…-AR-01 to AR-14 are each covered by the correspondingly labelled section (§1, §2, §4, §5, §6, §7, §8, §9, §10, §11, §13, §12, §16, §14); none is not_applicable. The required source PL-REQ-ID-REGISTER is not_applicable for the reason stated in the preamble.
+
+### 19.1 Self-review note on §17 disposition tally
+
+The authoritative tally for SE11-HW-BASELINE-1 is: ADOPT ×2 (B2, B8); ADOPT WITH ENGINEERING CONSTRAINT ×13 (B1, B3, B4, B5, B6, B7, B9, B10, B12, B14, B15, B17-switch, B18); DEFER / OPTIONAL ×5 (B11, B13, B16, B17 rack/PDU/trays/shelf, B19); SUBSTITUTE ×0; ESCALATE ARCHITECTURE IMPACT ×0 at baseline (conditional REV-* triggers in §12.3). The "×12" figure in the §17 Dispositions row is superseded by this note; §1.2 is the item-level record of truth.
