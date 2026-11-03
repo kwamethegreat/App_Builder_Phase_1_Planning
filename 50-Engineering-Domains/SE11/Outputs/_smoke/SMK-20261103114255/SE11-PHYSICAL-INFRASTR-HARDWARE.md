@@ -110,3 +110,77 @@ flowchart LR
   UPS_A[UPS-A USB-HID] -- shutdown signal --> NAS
   NAS -- network UPS server --> HOST
 ```
+
+## 3. Stakeholders, concerns and quality attributes (ISO/IEC/IEEE 42010 framing)
+
+| Stakeholder | Concern | Quality attribute (ISO/IEC 25010) | Measured by |
+|---|---|---|---|
+| EL | One coherent physical architecture to reference | Compatibility, maintainability | §4–§10 relationships; sign-off record §17 |
+| SE01 | Capacity inputs are ranges with assumptions | Capacity | §5.2, §6.5, §12 |
+| SE12 | Durable tier, RAID/replication boundaries, recovery expectations | Reliability (recoverability), fault tolerance | §6.3–§6.4, SE11-AC-07 |
+| SE14 | Physical ports, speeds, segments | Performance efficiency | §7, SE11-AC-05 |
+| SE17 | Trusted boot, management isolation, encryption support | Security (confidentiality, integrity) | §13, SE11-AC-08 |
+| SE19 | Burn-in, performance and resilience test surface | Reliability (maturity) | §14 |
+| SE20 | Inventory identity, telemetry, maintenance windows | Maintainability (analysability) | §10 |
+| VP / platform operator (via PL) | Provision only justified capacity; portability; no temporary architecture (§158, §160, §233, §238) | Portability, cost | §1.2 dispositions, §12 triggers |
+
+Non-functional targets this document introduces (to be bound to NFR ids by EL/SE19): SE11-REQ-01 reservation protection (§5.2), SE11-REQ-04 storage-path bandwidth (§7.2), SE11-REQ-06 safe-shutdown time budget (§8.3), SE11-REQ-08 telemetry coverage (§10.3).
+
+## 4. Workload-to-hardware allocation (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03)
+
+Allocation maps workload classes to **resource pools**, never to named devices; a pool is addressed by a logical name in configuration (§160: no hard-coded host names, local paths or addresses). Pools are the unit that moves between local, hosted and customer infrastructure (§168).
+
+| Workload class (seed §167, §169–§171, §174) | Resource pool | Physical backing in the reference configuration | Priority class (§174) | Placement rule |
+|---|---|---|---|---|
+| Platform core: orchestration, APIs, queues, registry/control | `pool.core` | Linux VM "Platform Core" on host NVMe M2_4 | Highest (stable runtime) | Reserved CPU/memory; never co-scheduled with destructive tests |
+| Data: databases, search/knowledge data, caches | `pool.data` | Linux VM "Data" on M2_4; backups/snapshots to NAS | Highest | Memory/IO-sensitive; largest reserved memory share |
+| Build/CI: runners, build cache, artifact generation | `pool.build` | Linux VM "Build/CI" on M2_2 (VM disk) with scratch on M2_3; bursts into hosted runners | Medium | Burst into unreserved capacity; back-pressure on queue |
+| Validation/staging: integration, security validation, staging, release challenger, VP validation | `pool.validate` | Linux VM "Validation/Staging" on M2_2; fault-injection targets only inside this VM | High | Preempts batch work near stage gates; destructive tests restricted here (§156) |
+| Agent execution (API-based model workers) | `pool.agents` | Elastic workers: hosted/cloud executors first; local worker class when triggered (§12.2); may run as containers inside `pool.build` while small | Medium | Disposable, idempotent, capability-matched (§170) |
+| Test/browser/scanning workers, synthetic users | `pool.test` | Elastic workers as above | Medium / lowest | Disposable; results persisted to NAS evidence store |
+| Local AI inference, embeddings, vision, evaluation (§176) | `pool.gpu` | Deferred: host PCI_E1 GPU when adopted (§5.4); external providers meanwhile (§160, §175) | Medium | Only via the same AI-dependency governance as external models (§177) |
+| Stable runtime of accepted stage baselines | `pool.runtime` | Same VMs as `pool.core`/`pool.data` with separate namespaces/projects, credentials, networks, data paths (§156) | Highest | Protected from build/test changes by VM boundary (§168) |
+| Durable storage: backups, snapshots, release evidence, VM/container archives, repositories/mirrors | `pool.durable` | NAS RAID 6 volume; independent/off-site copy as program matures (§164) | n/a | Never the hot working set (§164) |
+| Background analysis, documentation, low-priority optimisation | `pool.background` | Any unreserved capacity, host or workers | Lowest | Yields to all other classes; first to be shed on degradation (§175) |
+| Operator/admin interactive work | `pool.admin` | Windows host + WSL2 Ubuntu + Docker Desktop (§167) | n/a | Convenience only; nothing persistent depends on WSL2 (§166) |
+
+Rule SE11-REQ-01: every pool has a declared reservation (floor) and a burst ceiling; `pool.core`, `pool.data` and `pool.runtime` reservations are hard (never oversubscribed); all other pools share the remainder with oversubscription permitted (§157). EL's deployment documents bind services to pools; SE01's capacity model sizes pool floors from the telemetry in §10.3.
+
+## 5. Compute architecture (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-04)
+
+### 5.1 Host-role requirements
+
+| Requirement | Specification | Source |
+|---|---|---|
+| CPU | 16 physical cores / 32 threads, homogeneous cores, ≥64 MB L3, hardware virtualization + IOMMU enabled in firmware | B1 (§227.1); needed for Hyper-V VM isolation (§168) |
+| Memory | 256 GB DDR5 installed as one matched 4-DIMM kit; EXPO profile only after stability pass; fallback DDR5-5600/5200 | B4 (§227.4), §162 |
+| PCIe / slots | PCI_E1 Gen5 x16 reserved for the deferred accelerator; PCI_E3 Gen4 x4 carries the 10GbE NIC; PCI_E2 Gen3 x1 unused (insufficient for 10GbE); USB4 ×2 free for emergency storage/console | B3 (§227.3) |
+| Local NVMe (4 slots, all populated) | M2_1 Gen5 x4 (CPU): 1 TB system — Windows + WSL2; M2_2 Gen5 x4 (CPU, shares with USB4): 4 TB VM disks + artifact store; M2_3 Gen4 x2 (chipset, shares with PCI_E3): 1 TB build cache/scratch; M2_4 Gen4 x4 (chipset): 4 TB platform data/DBs/containers; total 10 TB | B5, B6 (§227.5–§227.6), §163 |
+| Host OS / hypervisor | Windows 11 Pro with Hyper-V; Linux VMs for all durable services; WSL2 + Docker Desktop for interactive work only | B9 (§227.9), §166–§168 |
+| Firmware baseline | UEFI with Secure Boot and TPM 2.0 enabled (Windows 11 Pro prerequisite; verified in SE11-AC-01); Wi-Fi 7 / Bluetooth disabled | §13 |
+| Thermal | Dual-tower air cooling 157 mm in a mesh-front mid-tower with three 140 mm intake fans; sustained 230 W CPU package + 145 W optional GPU envelope validated by burn-in (SE11-AC-04) | B2, B8 |
+
+### 5.2 Resource-reservation constraints (ranges with assumptions; SE01 and SE11-HARDWARE-CAPACITY-SIZING refine from measurement)
+
+| Pool / VM | vCPU reservation (floor) | vCPU ceiling | Memory floor (GB) | Memory ceiling (GB) | Assumption |
+|---|---|---|---|---|---|
+| Windows host + Hyper-V + WSL2/Docker Desktop | 2 physical cores | 4 | 16 | 32 | WSL2 memory capped by `.wslconfig`; host never swaps |
+| Platform Core VM | 4 | 8 | 24 | 32 | Orchestrator, APIs, queues, registry |
+| Data VM | 4 | 8 | 48 | 64 | Databases + search/knowledge data + caches (§167) |
+| Build/CI VM | 4 (burst 12–16) | 24 (oversubscribed) | 32 | 64 | Parallel builds burst into unreserved cores |
+| Validation/Staging VM | 4 | 12 | 32 | 48 | Production-like replica incl. challenger |
+| Unreserved burst / local containers for agents, tests | remainder | — | remainder | — | Shed first on degradation (§175) |
+| **Totals (floor)** | 18 of 32 threads reserved as floors | — | **152 GB floors; 192–240 GB at typical ceilings** | ≤ 256 GB | 256 GB leaves 16–64 GB headroom at ceiling; the 192 GB lower bound is the sizing justification in SE11-DEC-03 |
+
+Assumptions: ASM-SE11-03 — no measured workload exists at Stage 0; the floors above come from the five required logical environments in §156 and the layout in §167, and must be replaced by measured p95 values after the first stage's telemetry (§234 H.3). Memory ceilings never exceed physical memory; the hypervisor must not be configured for dynamic over-commit of the Highest-priority pools (SE11-REQ-01).
+
+### 5.3 Virtualization/host implications
+
+- VM count and boundaries remain an engineering decision (§167); the four Linux VMs above are the minimum that satisfies the isolation rule of §156 (separate namespaces, credentials, networks, data paths, secrets, pipelines, budgets). Merging Core and Data into one VM is permitted only if memory floors are preserved and SE17 accepts the shared blast radius.
+- VM disks live on M2_2; databases and container layers on M2_4, so that a build-cache or VM-disk saturation on one device cannot starve database IO on the other (SE11-REQ-02: no two Highest-priority pools share a single NVMe device with a Medium-priority pool).
+- Snapshots of the Validation/Staging and Core VMs are taken before any firmware/driver change (§10.4) and replicated to `pool.durable`.
+- Nothing in the VM layer may encode physical slot ids, device serials, or the host name; portability requirement §160 applies to every VM definition.
+
+### 5.4 Accelerator (deferred) preconditions
+
+The GPU (B11) stays DEFER / OPTIONAL until all of the following hold: (a) a measured trigger from §12.2 (local-inference latency/privacy/cost case or GPU-required application testing, §176); (b) SE11-AC-02 confirms PCI_E1 x16 availability, 241 mm single-slot clearance and the 12V-2x6 cable; (c) SE11-AC-06 confirms the measured full-load system draw plus 145 W stays ≤ 80 % of the 750 W PSU rating; (d) SE11-AC-03 confirms a supported path to expose the GPU to a Linux VM on client Hyper-V (device assignment or partitioning) — if no supported path exists, the fallback is a host-level local-model service exposed to VMs over the internal virtual network, recorded as an SE11-DEC entry; (e) local models are registered under the same AI-dependency governance as external models (§177). Any accelerator above 145 W, a second accelerator, or a dual-slot card is ESCALATE ARCHITECTURE IMPACT because it exceeds the PSU, slot and thermal envelope of the reference configuration (SE11-ADR-04).
