@@ -718,3 +718,162 @@ Common-mode failure domains are named explicitly so that every consuming documen
 
 Dependency-failure behaviour summary: a local infrastructure problem must not corrupt active builds or accepted runtime state; resumable jobs, durable state and idempotent execution are required of every workload placed on these pools (§175) — EL/SE19 implement and prove this; SE11 guarantees only the physical boundaries above and publishes the signals of SE11-DEC-11 under the contract of §18.2.
 
+
+## 10. Hardware manageability / operability (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-09)
+
+### 10.1 Inventory identity (SE11-REQ-07)
+
+Every physical asset carries an inventory id `CSPUI-HW-<class>-<nn>` (classes: HOST, NAS, HDD, NVME, NIC, GPU, UPS, SW, RACK, PDU, WKR, CABLE, T3SUB) recorded in a version-controlled inventory file owned by SE11, committed to `REPO` (§6.3) and published through `SE11-CONTRACT-hardware-baseline@1` (§18.2). Record fields: inventory id; BOM reference (B1–B19); specification class (§11.4); part number as cited from SEED-01 and its evidence status (DEFERRED-PENDING-EVIDENCE / confirmed / superseded); serial number; firmware/BIOS/driver version at commissioning; physical position (slot id such as `M2_3`/`PCI_E1`, NAS bay, rack U); power domain (PD-A/PD-N/PD-B); failure-domain ids (§9); disposition and quantity status (§1.2); §6.1a row and mapping (D/V) in force with V_min/B_max; signalling candidate and restart mechanism; pre-build evidence record id (§11.3); commissioning evidence ids (§14); warranty end; sanitisation state. Cables are labelled at both ends with the endpoint ids. The **configuration fingerprint** (§11.3) is derived from these records.
+
+### 10.2 Remote-management capabilities where available
+
+| Device | Out-of-band | In-band management path | Fallback |
+|---|---|---|---|
+| Central host | None (consumer board; no BMC/IPMI) — SE11-RISK-04 | Windows remote administration and Hyper-V management on `seg.mgmt`; MFA per §59 | Physical console in the lockable room; UEFI Flash BIOS and Clear CMOS on the rear panel (B3); RTC wake (M3) if evidenced |
+| NAS | None | NAS OS web/remote administration on `seg.mgmt` | Front panel / USB; Wake-on-LAN (N1) if evidenced |
+| Switch | Management port if the class provides one | Management VLAN | Console port |
+| UPS-A / UPS-N | USB-HID to the host (S-1/S-3) or NAS (S-2/S-3) | Status via the UPS software's telemetry export, re-published by SE11's exporter | Front LCD |
+
+### 10.3 Telemetry and health status (SE11-REQ-08, SE11-NFR-04; published under `SE11-CONTRACT-hardware-signals@1`, consumed by SE20 monitoring, SE01 capacity, SE19 validation, EL scheduler)
+
+Mandatory signals from first power-on ("capture performance/resource telemetry from the first workloads", §160; "capture CPU, memory, I/O, network, queue time, job duration, reliability, and cost", §234): host CPU utilisation per VM and total, CPU-wait per VM, memory committed per VM and host against Table 5.3-R, NVMe SMART (temperature, media errors, percentage used, TBW consumed) per device, per-virtual-disk IOPS and bytes (the summed Build figures against B_max, Validation against V_min) and latency (and `io.max` throttling counters when the guest limiter is in use), PCIe negotiated width/speed per slot (detects degraded M2_3/PCI_E3 sharing), NIC link speed and errors, NAS array state (healthy/degraded/rebuilding), per-drive SMART, NAS volume utilisation, snapshot success, backup and T3 job success/duration/throughput, **per-class `mech_ok(c)`, `t3_last_ok(c)`, `kind(c)`, `age(c)` and protection state, platform `PL-*` state**, UPS state per UPS (online/on-battery/low-battery, load %, runtime estimate, battery charge %, battery age, communication state), restart-mechanism armed/fired/wake-poll events, host and NAS temperatures, switch port utilisation on L1/L2, and the event signals of SE11-DEC-11. **How they are delivered is SE11's contract, not SE20's design:** a metrics endpoint on `seg.mgmt` (pull, text exposition, sample interval ≤ 60 s, no workload content) and an append-only event log (push to a local durable queue in the Core VM with at-least-once delivery and a monotonic sequence number) — both specified in §18.2 Part B so that SE20's monitoring integration is a subscription to a defined interface. Thresholds that trigger expansion or revision are in §12.
+
+### 10.4 Firmware / BIOS / driver lifecycle (SE11-REQ-09)
+
+- Components with a firmware lifecycle: host UEFI/BIOS (incl. CPU microcode/AGESA), NVMe firmware ×4, NIC driver/firmware, optional GPU driver, NAS OS and HDD firmware, UPS firmware and host/NAS UPS software, switch firmware.
+- Update path: vendor-signed images only, checksum verified against the vendor publication, staged in a declared maintenance window (§10.5) after a successful snapshot of all VMs and a verified T2 backup; one component class per window; rollback plan recorded; post-update SE11-AC-04 smoke subset executed; firmware settings baseline re-verified (SE11-AC-08a), including "restore on AC power loss", RTC wake and the UPS-command settings of §8.3; configuration fingerprint updated.
+- Ownership: SE20 schedules and executes; SE17 defines integrity controls (SE11-SECREQ-02); SE11 keeps the compatibility matrix (§11) current.
+
+### 10.5 Maintenance windows
+
+Hardware maintenance is performed only in a window declared to SE20's operations calendar that does not overlap a stage-gate VP validation (§174 "VP validation / release assurance"). Minimum window content: pre-checks (backup verified, snapshots taken, UPS healthy, all D-IRR classes with real data PROTECTED with kind COPY or the exposure explicitly accepted by SE12), the change, post-checks (SE11-AC-04 smoke, telemetry nominal), inventory record and fingerprint updated.
+
+## 11. Compatibility / availability assessment (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-10)
+
+### 11.1 Structural compatibility check (from the BOM specifications themselves)
+
+| Check | Items | Result from BOM data | Residual verification |
+|---|---|---|---|
+| Socket / chipset | B1 AM5 ↔ B3 AM5/X870 | Structurally compatible | BIOS version supporting the CPU: **not established** (FC-01) |
+| Memory | B4 DDR5 UDIMM ↔ B3 "4× DDR5 DIMM, up to 256 GB" | Compatible at capacity; DDR5-6000 EXPO on four DIMMs is a stability-validated profile, not a guaranteed one (the seed prescribes the 5600/5200 fallback) | Exact population (2-DIMM M-A vs 4-DIMM M-B/M-A+) on the board's qualified list: **not established** (FC-02); stability pass SE11-AC-04 |
+| Cooler | B2 157 mm ↔ B8 ~166 mm clearance; AM5 mounting included | Compatible | — |
+| Form factor | B3 ATX ↔ B8 ATX/E-ATX | Compatible | — |
+| PCIe lane sharing | B10 in PCI_E3 (Gen4 x4, "shares with M2_3") ↔ B5 in M2_3 (Gen4 x2) | Simultaneous operation **not established** from BOM text (FC-03) | SE11-AC-02 read-back; Fallbacks A/B/C, Mapping-V (§6.1a) |
+| NIC in PCI_E1 (Fallback A) | B10 PCIe 3.0 x4 card in a Gen5 x16 CPU slot | Electrically and mechanically a subset; **operation not established** (FC-03) | SE11-AC-02 when Fallback A is used |
+| M2_2 ↔ USB4 sharing | B6 on M2_2 ("sharing with USB4") | USB4 unused at baseline; no conflict | Confirm USB4 use does not down-shift M2_2: SE11-AC-02 |
+| PSU | B7 750 W, 12V-2x6 ↔ B1 230 W + B11 145 W + platform | Within rating for the no-GPU build; GPU build conditional on measurement (seed condition) | SE11-AC-06 |
+| GPU mechanical | B11 single-slot 241 mm ↔ B8 mid-tower, PCI_E1 x16 | Expected to fit; not asserted | SE11-AC-02 before adoption |
+| NAS memory | B13 DDR5-4800 ECC SO-DIMM ↔ B12 "2 slots; 64 GB max"; mixed 16 + 32 GB | Capacity compatible; mixed pair support **not established** | SE11-AC-01 (deferred item) |
+| NAS drives | B14 3.5-inch SATA CMR ↔ B12 8 SATA bays | Compatible | Online RAID 6 expansion support: **not established** (FC-08) |
+| Network | B10 10GBase-T ↔ B12 2×10 GbE; Cat6a supplied with NAS (§228.1) | Compatible | Switch class 10GBase-T or SFP+ with matching transceivers: SE11-AC-05 |
+| UPS | B15 1000 W ↔ PD-A loads (§8.2); NEMA 5-15P ↔ 15 A circuit (§231) | Compatible; runtime unknown until measured | SE11-AC-06 |
+| UPS signalling and restart | B15 USB-HID / host software ↔ B12 network UPS server; commanded output power-cycle (M1); NAS client wait ≥ 240 s (S-2); RTC wake from soft-off (M3); NAS WOL (N1) | **Not established** (FC-09) | SE11-AC-01, SE11-DEC-10, SE11-DEC-13/17 |
+| OS / virtualization | B9 Windows 11 Pro ↔ Hyper-V; TPM 2.0 + Secure Boot prerequisites; Linux guest support; NIC driver for the virtual switch; per-virtual-disk IOPS controls; guest cgroup v2 `io.max` | Hyper-V is a Pro feature; TPM/Secure Boot are install prerequisites so the platform must provide them; NIC driver (FC-05) and storage-QoS availability (FC-06) **not established**; cgroup v2 `io.max` is a Linux guest facility whose availability on the chosen distribution is confirmed in SE11-AC-03 | SE11-AC-01, SE11-AC-03 |
+
+### 11.2 Current manufacturer support and practical availability — NOT ESTABLISHED; outcome UNMET (corrects finding 008)
+
+The allowed corpus contains no manufacturer support statement, firmware/BIOS release information, qualified-vendor list, driver compatibility statement or market availability for any BOM item, and SE11 has no access to manufacturer publications in this run. For every item the following are therefore **not established** and **not asserted** (BND-04): current manufacturer support status; a BIOS version supporting the CPU; the exact memory population on the board's qualified list; simultaneous PCI_E3/M2_3 operation; NIC driver support for the hypervisor virtual switch; hypervisor storage-QoS availability on the host OS edition; UPS software ↔ host OS, NAS ↔ UPS protocol, commanded output power-cycle, RTC wake and NAS WOL support; NAS online array expansion; practical availability of any part number.
+
+**What the class baseline does and does not do (SE11-DEC-14).** Deferring every part number (B1–B17: DEFERRED-PENDING-EVIDENCE, §1.2) and baselining specification classes (§11.4) prevents this document from fixing an unverified part-number combination. It does **not** demonstrate that a coherent, currently supported configuration of those classes exists: the conditions below are class-level feasibility conditions that only dated, attributable pre-build evidence can close. Until SE11-AC-01 records at least one coherent supported configuration (or supported alternative within class), **QC-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-03 is UNMET** (§0.3), no buildable bill exists, the configuration fingerprint is empty, and the baseline stays PROVISIONAL (§17).
+
+**Open class-level feasibility conditions (each closed only by the stated evidence; failure consequence stated):**
+
+| Id | Condition that must hold for the architecture to be buildable | Evidence that closes it (dated, attributable, recorded in §11.3) | If it fails |
+|---|---|---|---|
+| FC-01 | A board of the B3 class ships or can be updated to a BIOS that supports the B1-class CPU with the required virtualization/IOMMU, Secure Boot, TPM 2.0, AC-recovery and RTC-wake settings | Board manufacturer BIOS release notes / CPU support list for the exact board and CPU; firmware settings reference | Substitute board or CPU within class (new SE11-DEC) |
+| FC-02 | The chosen memory population (2-DIMM M-A; 4-DIMM M-B/M-A+) is on the board's qualified list or validated at ≥ DDR5-5200 | Board qualified-vendor list entry for the kit and population; else SE11-AC-04 stability pass at the fallback speed | Smaller population or different kit within class; M-A+ path re-validated |
+| FC-03 | PCI_E3 (x4 NIC) and M2_3 (x2 NVMe) operate concurrently, **or** a Gen3 x4 NIC operates in the Gen5 x16 CPU slot (Fallback A), **or** Fallback C's x1 path still meets SE11-REQ-04 | Board manual lane-sharing statement; SE11-AC-02 read-back | Fallback B (scratch on M2_2) with its storage consequences; Mapping-V unavailable under B |
+| FC-04 | The host OS edition supports the Hyper-V role with the per-VM reserve/limit/weight and static/dynamic memory controls used in §4–§5 | Host OS feature documentation for the exact edition/version | Edition change within the B9 class (new SE11-DEC) |
+| FC-05 | The NIC class has a driver supporting the hypervisor virtual switch at 10 Gb/s on the host OS version | NIC vendor driver support statement; SE11-AC-03 | Different 10 GbE NIC within class (SFP+ allowed with matching switch) |
+| FC-06 | Per-virtual-disk storage QoS is available on the host OS edition — else the guest `io.max` limiter is available on the chosen Linux distribution | Host OS / distribution documentation; SE11-AC-03 | The §6.1a "QoS unavailable" rows apply; if neither limiter exists, Validation may not share a device with Build → Mapping-V mandatory or R2 |
+| FC-07 | (Only when TRG-GPU fires) a supported path exposes the B11-class GPU to a Linux VM on the client hypervisor | Hypervisor and GPU vendor documentation | Host-level model service fallback (§5.5) |
+| FC-08 | The NAS OS supports online RAID 6 expansion from the N-A count, UPS integration per the selected candidate, power-on after AC recovery and (for M3) Wake-on-LAN | NAS OS feature documentation for the exact version | N-B installed from the start (recorded deviation from N-A) ; S-3; N1 unavailable → M1 mandatory or NAS attended |
+| FC-09 | The UPS class, with the host/NAS software at the exact versions, supports the selected signalling candidate, commanded output shutdown with auto-restart (M1), and the board supports RTC wake from soft-off (M3) | UPS vendor software documentation; board manual; SE11-AC-15 | Candidate change (S-3); mechanism change (M3); if neither M1 nor M3 can be evidenced, SE11-REQ-15 is unmet and the stable-runtime baseline is blocked (§8.4) |
+
+### 11.3 Pre-build support evidence record (SE11-AC-01) and baseline selection / configuration fingerprint
+
+**Pre-build evidence register (template; one row per item and claim; every row is NOT PERFORMED at v4):** item (B-id); part number as cited; claim checked (the FC-nn condition and/or the per-item claims: support status, BIOS/firmware version, qualified population, slot coexistence, driver/OS/hypervisor support, storage-QoS and guest `io.max` availability, UPS protocol, M1, S-2 client wait, RTC wake, N1, NAS online expansion, availability); source (publisher, document title/version, date accessed); result (confirmed / not confirmed / superseded); consequence (confirmed into the fingerprint / substitute within class with a new SE11-DEC / defer); recorder; date. "Not confirmed" on any item keeps that part number deferred; a superseded item is substituted by specification class and recorded (SE11-REQ-12).
+
+**Baseline selection record (separate from commissioning evidence).** When SE11-AC-01 completes, SE11 records *one* coherent configuration — the ordered list of (B-id, confirmed part number or in-class substitute, evidence row ids closing FC-01 … FC-09 as applicable, memory candidate M-x, NAS candidate N-x, signalling S-x, restart M-x/N-x) — as **configuration fingerprint v0**. That record is the sole basis on which QC-AR-03 can later be reported met; it is produced before any purchase or build and is independent of the commissioning tests. **At v4: fingerprint v0 does not exist; no selection has been made; no evidence row exists.**
+
+**Commissioning tests (after build, §14):** SE11-AC-02 … SE11-AC-15 measure what the built configuration actually does; they never substitute for the pre-build record. The fingerprint is updated to v1 at SE11-AC-10 with serials, firmware versions, slot positions, the §6.1a row/mapping in force, protection-state defaults A_max/G and the evidence ids. Any change to the fingerprint re-opens SE11-AC-01 for the changed item and SE11-AC-10 for the baseline.
+
+### 11.4 Specification classes — what is baselined (not procurement preference; preserve performance, reliability, security, portability and schedule assumptions)
+
+| BOM item | Specification class (baselined) |
+|---|---|
+| B1 CPU | AM5 desktop CPU, ≥ 16 physical cores, ≥ 64 MB L3, ≤ 230 W package, hardware virtualization + IOMMU |
+| B2 cooler | Dual-tower air cooler ≤ 160 mm height with AM5 mounting, rated ≥ 230 W |
+| B3 motherboard | ATX AM5, 4×DDR5 to ≥ 256 GB, ≥ 1× PCIe x16 (CPU) + ≥ 1× PCIe x4 slot usable concurrently with ≥ 4× M.2 (≥ 2 of them x4), ≥ 2.5 GbE onboard, UEFI Secure Boot, TPM 2.0, "restore on AC power loss" setting, RTC wake from soft-off |
+| B4 memory | Matched DDR5 UDIMM kit per candidate (Table 5.3-R), ≥ DDR5-5200 validated at the chosen population; ECC-capable platform class is the recorded substitute if SE11-RISK-02 materialises |
+| B5/B6 NVMe | M.2 2280 PCIe 4.0 x4 (or 5.0), TLC with DRAM, ≥ 600 TBW per TB, 5-year warranty class; devices with power-loss protection are the recorded upgrade class if SE11-AC-13 shows unrecoverable corruption |
+| B7 PSU | ATX 3.1 / PCIe 5.1, ≥ 750 W, Cybenetics Gold or better, native 12V-2x6, fully modular, ≥ 7-year warranty class |
+| B8 case | Mid-tower ATX with mesh front, ≥ 160 mm cooler clearance, ≥ 250 mm GPU clearance |
+| B9 OS | Windows 11 Pro-class edition with Hyper-V, per-VM processor/memory resource controls, TPM 2.0/Secure Boot support |
+| B10 NIC | 10GBase-T (or SFP+ with matching switch), PCIe 3.0 x4 or 4.0 x2 minimum, driver supporting the Windows Hyper-V virtual switch; operable in a x16 CPU slot (Fallback A) |
+| B11 GPU | Single-slot, ≤ 145 W, ≥ 24 GB ECC VRAM, PCIe x16, 12V-2x6 or 8-pin; larger classes ESCALATE |
+| B12 NAS | 8-bay SATA NAS with ECC memory, ≥ 2×10 GbE, Btrfs/ZFS-class snapshots, per-folder/volume AES-256, UPS integration (any of S-1/S-2/S-3), power-on after AC recovery, Wake-on-LAN preferred, M.2 cache slots; hosted object storage is the equivalent for T2/T3 under G-LOCAL |
+| B14 HDD | 3.5-inch enterprise CMR, 7,200 RPM, ≥ 2.5 M h MTBF, ≥ 550 TB/yr workload, 5-year warranty, ≥ 20 TB (smaller same-class drives permitted under N-A if V is small) |
+| B15/B16 UPS | Pure-sine line-interactive with AVR, USB-HID, ≥ 1500 VA / 1000 W (PD-A) and ≥ 1000 VA / 600 W (PD-N / PD-B), user-replaceable batteries, commanded output shutdown with auto-restart on mains (M1) and configurable restart delay preferred; higher-runtime units of the same class are the remedy under §8.4 |
+| B17 switch | Managed L2+, ≥ 2×10 GbE (≥ 4 preferred), 24× ≥ 1 GbE access, VLAN, port mirroring for SE17/SE19 |
+| T3-SUB medium | Removable encrypted medium or second independent location sized to the D-IRR set (§6.3) |
+
+## 12. Expansion model (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-12)
+
+### 12.1 Planned spare capacity at baseline
+
+| Resource | Spare at baseline | Scale path |
+|---|---|---|
+| Host PCIe | PCI_E1 x16 (reserved for GPU; occupied by the NIC under Fallback A), PCI_E2 x1, 2×USB4 | Scale-up only |
+| Host memory | M-A/M-C: two free slots (second matched pair → M-A+, re-validation); M-B/M-A+: none (board maximum) | **Hard ceiling at 256 GB** — REV-MEM |
+| Host NVMe slots | None (4/4 populated) | Device-capacity scale-up; SATA ×4 for cold tiers only |
+| NAS bays / M.2 | N-A: 4 bays; N-B: 2 bays; 4× M.2 | Same-class drives; cache/metadata |
+| NAS network | 1×10 GbE + 2×5 GbE | Second 10 GbE consumer or link redundancy |
+| Switch ports | all minus 2–3 at baseline | Workers, gateway, management devices |
+| Rack | 18U, 12–17U usable (§230) | Worker trays, second switch, PD-B |
+| Power | PD-A margin per §8.2 and the §8.4 runtime reserve; PD-B unused | Workers only on PD-B |
+| Worker pool | Elastic: hosted/cloud executors unbounded by local hardware (§168) | Scale-out by default |
+
+### 12.2 Evidence-driven triggers that add hardware without architecture revision (§159, §171)
+
+| Trigger id | Signal (from §10.3 telemetry) | Action |
+|---|---|---|
+| TRG-WKR-LOCAL | Build/test queue wait p95 above the SE01-defined threshold for two consecutive stages **and** hosted-runner cost or data privacy makes local execution preferable (§168, §171) **and** the limiting factor is worker capacity, not central resources, storage, network, provider quotas or software (§171) | Adopt local worker class (B19), rack, PDU, UPS-B (B16/B17) |
+| TRG-GPU | Measured external-model latency/cost/privacy case or GPU-required application testing (§176) with §5.5 preconditions met (including release of PCI_E1 from Fallback A) | Adopt B11 |
+| TRG-MEM-EXPAND (M-A/M-C only) | Measured committed memory p95 > 80 % of installed for one stage **and** the §5.3 procedure records Steps 1 and 2 as failed | Add the second matched pair (M-A+; re-run SE11-AC-04 memory pass); record SE11-DEC |
+| TRG-NAS-MEM | NAS memory sustained > 70 % or snapshot/backup jobs missing their window from memory pressure | Install B13 |
+| TRG-NAS-CAP | T2 utilisation > 70 % | Add same-class drives to free bays (N-A → N-B) |
+| TRG-NET-10G | L1 utilisation > 70 % sustained during backup windows, or a second 10 GbE consumer | Use NAS second 10 GbE / add 10 GbE ports within the switch class |
+| TRG-NVME-TBW | Any NVMe > 80 % of rated TBW or media errors (M2_2 watched closely when scratch is on it) | Replace with same class (§11.4) |
+| TRG-UPS-BATT | Any UPS runtime estimate at measured load < B_u / 0.7 | Battery replacement (same class) or §8.4 remedies |
+
+### 12.3 Scale-out versus scale-up boundaries and architecture-revision triggers
+
+The central node complements, never replaces, horizontally scalable workers (§177). Scale-out (more workers, hosted executors) is the default answer to throughput; scale-up applies only to the capabilities the seed assigns to the central node — large contiguous RAM, low-latency CPU, NVMe, centralized data/control services (§161). The following require a revision of this architecture (new SE11 version plus EL review), not a hardware addition:
+
+| Revision trigger | Why adding hardware is insufficient |
+|---|---|
+| REV-MEM: §5.3 Step 4 (1.25 F > 256 GB with hosted placement inadmissible), or Highest-priority pool floors exceed 85 % of 256 GB on measured p95 | Board ceiling reached; second host, larger-memory platform class, or data-tier redesign is an architectural choice |
+| REV-HA: an SLO (§117) requires the control plane or Data VM to survive FD-HOST or FD-NVME-M2_4, or requires unattended restart that no evidenced mechanism provides | Needs a second failure domain and quorum design (§173) |
+| REV-GPU-CLASS: accelerator > 145 W, dual-slot, or second accelerator | Exceeds PSU, slot and thermal envelope (§5.5) |
+| REV-STORAGE-HOT: T1 > 85 % after device scale-up; a random-IO workload that cannot stay on host NVMe; §6.1a remedy R2 (Validation's demand cannot fit beside Build and Mapping-V is unavailable or insufficient) | NAS is not a hot tier (§164); host NVMe topology exhausted |
+| REV-STORAGE: retention volume V > 44 TiB (§6.7) | Beyond the enclosure's economical RAID 6 envelope; hosted tier or second enclosure is architectural |
+| REV-NET: storage/core path saturated after all 10 GbE ports used, or 25 GbE class needed | Switch and NIC class change ripples through host slots |
+| REV-SITE: geographic/resilience footprint beyond one room (§226 F.20) | Hosted/hybrid footprint decision |
+| REV-POWER: §8.4 remedies exhausted, PD-A measured peak within 20 % of UPS-A rating, circuit limits reached, or no admissible restart mechanism meets the SLO | UPS/circuit redesign by qualified professionals; possible relocation |
+
+## 13. Security considerations (OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-11)
+
+The owners of the control catalogue (SE17 for infrastructure/workload/data security, SE15 for identity and cryptography, §74) have not published control ids in this run (their documents are absent, §0.1). This section therefore does two separable things (corrects finding 003's security part): **(a)** it states the hardware security requirements under SE11's identifiers and, for each, the check that **SE11 itself executes and can pass without any owner catalogue** (SE11-REQ-19, SE11-AC-08a) — these are implementable from this document alone; **(b)** it names what remains the owner's (policy, control ids, custody, identity) as placed requirements, unmet dependency SE11-DEP-05, verified later as SE11-AC-08b. No foreign control id is invented; nothing re-derives a control design.
+
+| Id | Requirement placed on the hardware baseline | (a) SE11-executable check (SE11-AC-08a) — pass criterion | (b) Owner part (SE11-AC-08b, UNMET until SE11-DEP-05) |
+|---|---|---|---|
+| SE11-SECREQ-01 Trusted boot | UEFI Secure Boot enabled; TPM 2.0 present and enabled; boot order locked to M2_1; UEFI administrator password set; the RTC-wake and AC-recovery settings of §8.3 are part of the protected firmware baseline | Firmware settings export shows Secure Boot = on, TPM 2.0 = enabled and owned, boot order = M2_1 only, admin password = set, AC-recovery = power on, RTC wake = enabled; host OS reports Secure Boot state on; export checksum recorded in the fingerprint | SE17: measured-boot attestation decision and control id |
+| SE11-SECREQ-02 Firmware integrity | Vendor-signed images only, checksum verified, staged in maintenance windows with snapshot + verified backup first (§10.4); firmware settings baseline re-verified after every BIOS update | Each firmware record in the inventory carries the vendor checksum and the verification result; post-update settings export matches the baseline | SE17 (policy, control id), SE20 (execution) |
+| SE11-SECREQ-03 Management-plane isolation | All management endpoints (host admin, hypervisor, NAS admin, switch, UPS software, telemetry exporter, shutdown/WOL command paths) only on `seg.mgmt`, unreachable from `seg.build`, `seg.worker`, `seg.egress`; no management interface exposed to the internet; the NAS shutdown command (S-1) is authenticated | Port-scan from a host in each of `seg.build`, `seg.worker`, `seg.egress` reaches no management endpoint; from the gateway side no management port is reachable; the NAS shutdown command fails without credentials (SE11-AC-05 segmentation log) | SE17: inter-segment policy and control id; SE15: MFA, least-privilege, short-lived credentials per §59/§112 |
+| SE11-SECREQ-04 Physical and administrative access | Lockable room; host, NAS, switch and UPS inside; the T3-SUB medium outside it; physical console use is a logged administrative action; segregation between hardware maintenance (SE11/SE20) and security configuration (SE17) per §112 | Room lock verified; devices inside recorded by inventory position; console sessions appear in the host audit log | SE17: custody rule for T3-SUB, access-control id, segregation control |
+| SE11-SECREQ-05 Data at rest | Host full-disk encryption on M2_1 with TPM-bound keys; encryption of VM disks on M2_2/M2_3/M2_4 inside the Linux VMs or by the hypervisor (hardware supports both); NAS per-folder AES-256 (B12) for backups, evidence and archives; T3 and T3-SUB copies encrypted before leaving the site; the `KEYS` class under §6.3 | Host volume reports encryption on with TPM protector; each VM disk or guest volume reports encryption on; NAS shares for T2 report encryption on; a T3/T3-SUB object sampled at rest is ciphertext | SE17/SE15: key custody, recovery and the offline custody secret for KEYS; control ids |
+| SE11-SECREQ-06 Media sanitisation | NVMe, HDD and T3-SUB media sanitised on decommissioning/RMA; inventory record marks sanitised state | Inventory field present and required for state "decommissioned" | SE17: sanitisation standard and control id |
+| SE11-SECREQ-07 Supply chain at receipt | Serial numbers recorded; packaging/tamper evidence inspected; firmware version read and compared with the vendor's published current version before first power-on; default credentials on NAS, switch and UPS software rotated at commissioning | Receipt record per asset with serial, inspection result, firmware version and comparison; credential rotation logged | SE17: supply-chain control id |
+| SE11-SECREQ-08 Confidential-processing boundary | Private application/customer data is processed only by authorised locally hosted models or deterministic tools (§66); any local accelerator (B11) and the Data VM sit inside `seg.platform` behind the default-deny disclosure gateway on `seg.egress`; hardware telemetry export (§10.3) carries no workload content; candidate M-C (hosted data) is admissible only where §66 permits | Telemetry payload sampled during SE11-AC-09 contains only the §10.3 fields; `seg.platform` has no route to `seg.egress` except via the gateway address (SE11-AC-05) | SE17/EL: gateway policy, control id; §66 applicability decision for M-C |
+
