@@ -33,6 +33,9 @@ baseline. Your verdict is final for this cycle and the author must act on every 
                   "description": "<what is wrong, with the quote or location>",
                   "required_correction": "<exactly what must change for this finding to close>" } ] }
 ```
+- Field names are read by a machine: use exactly `id`, `severity`, `type`, `outline_id`, `source_or_requirement_id`,
+  `description`, `required_correction` in every finding. A finding missing one of them (e.g. `required_change` instead of
+  `required_correction`) is rejected and you are re-invoked with the problems; extra fields are ignored.
 - `revise` requires at least one blocking or major finding. Minors alone ⇒ `pass` with the minors listed.
 - Blocking = the document cannot be consumed; major = a consumer would be misled; minor = quality.
 - Be specific enough that the author can fix it without guessing, and that the next reviewer can verify it closed.
