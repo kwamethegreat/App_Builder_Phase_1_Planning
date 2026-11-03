@@ -1,0 +1,70 @@
+---
+id: SE11-PHYSICAL-INFRASTR-HARDWARE
+version: 6
+status: complete
+owner: REVIEWER_EN
+based_on: [SE11-PHYSICAL-INFRASTR-HARDWARE, SEED-01]
+requirements: [ENV-DEC-017, SE11-REQ-16, SE11-REQ-12, SE11-GATE-06, SE11-AC-05]
+---
+run_id: SMK-20261103192618:SE11-PHYSICAL-INFRASTR-HARDWARE:review:5
+task_id: SE11-PHYSICAL-INFRASTR-HARDWARE
+reviewed_version: 5
+verdict: revise
+summary: >-
+  The architecture addresses all outline areas, identifies the exact seed baseline,
+  disposes the BOM, and exposes common-mode failures and evidence gates. The revised
+  power-loading rules use installed ratings consistently. The shutdown correction
+  covers recovery after STALE but does not cover communication gaps shorter than the
+  STALE timeout; its timing proof and worked example consequently remain inconsistent.
+review_scope:
+  - Included target version 5 and its revision history.
+  - Seed Revision 1.1 sections 227 and 229 checked against the stated compute and UPS BOM.
+  - Missing upstream documents, contract registration and external-fact verification excluded under the smoke-run instructions.
+re_review:
+  - id: REVIEWER_EN-SE11-PHYSICAL-01
+    disposition: resolved
+    evidence: Initial memory selection is conditional on SE11-GATE-10, not committed at the reference maximum.
+  - id: REVIEWER_EN-SE11-PHYSICAL-02
+    disposition: unresolved
+    evidence: Post-STALE recovery now preserves deadlines, but the pre-STALE communication-gap transition remains undefined.
+  - id: REVIEWER_EN-SE11-PHYSICAL-03
+    disposition: resolved
+    evidence: Separate non-overlapping PSU estimates and installed UPS ratings govern admission and substitution revalidation.
+  - id: REVIEWER_EN-SE11-PHYSICAL-04
+    disposition: resolved
+    evidence: NIC capability, required negotiated management speed and switch port budgets are distinguished.
+findings:
+  - id: REVIEWER_EN-SE11-PHYSICAL-02
+    severity: major
+    type: downstream_unusable
+    outline_id: OUT-SE11-PHYSICAL-INFRASTRUCTURE-HARDWARE-AR-07
+    source_or_requirement_id: SE11-REQ-16
+    description: >-
+      Section 7.5 equates absence of a STALE interval with intact communication and
+      therefore asserts first ON-BATTERY receipt within D = 2P. But STALE is entered
+      only after T_stale without an update, which is 60 seconds in the worked
+      configuration versus D = 20 seconds. Lost polls followed by a fresh ON-BATTERY
+      response before that timeout satisfy neither the intact bound nor rule 9,
+      which requires an already-latched B. For example, with the worked parameters,
+      last ONLINE at utility loss and first fresh ON-BATTERY receipt at 50 seconds
+      never enters STALE. Applying rule 2 gives A = 80 and host completion up to
+      200, while NAS initiation remains 200–210; the required 30-second ordering
+      margin fails despite I1–I3 passing. Under the document's allowed last ONLINE
+      receipt at D = 20, a fresh ON-BATTERY receipt at 70 is likewise before STALE
+      at 80 and permits host completion at 220, after NAS initiation. The worked
+      early-recovery row at 25 seconds already exhibits this missing transition:
+      it uses B_ON even though rule 4 cannot have latched B before 60 seconds.
+      An implementer cannot determine flush eligibility and the safe deadline for
+      this reachable path from the stated rules.
+    required_correction: >-
+      Define an observable transition for missed or delayed polls before the STALE
+      timeout. Either classify those gaps as blind with explicitly armed deadlines
+      and local-only recovery, or derive conservative flush-eligible timing bounds
+      that include the entire permitted observation gap and adjust the NAS deadline
+      and admission inequalities accordingly. Do not infer the 2P bound solely from
+      absence of STALE. Make the early-recovery example follow the actual arming
+      rules, and extend SE11-GATE-06 and SE11-AC-05 with recovery before T_stale,
+      including first ON-BATTERY receipt later than D and boundary cases just before
+      STALE. Each test must establish its initiating deadline, flush eligibility,
+      host completion, NAS initiation and the required ordering margin or explicit
+      local-only behavior. Reconcile the resulting proof and dependent summaries.
